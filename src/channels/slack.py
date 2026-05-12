@@ -15,13 +15,18 @@ class SlackChannel:
         bot_user_id: str,
         orchestrator: Orchestrator,
         client_configs: dict[str, ClientConfig],
+        token_verification_enabled: bool = True,
     ):
         self._bot_user_id = bot_user_id
         self._orchestrator = orchestrator
         self._client_configs = client_configs
         self._pending: dict[str, ClarificationState] = {}
 
-        self._app = App(token=bot_token, signing_secret=signing_secret, token_verification_enabled=False)
+        self._app = App(
+            token=bot_token,
+            signing_secret=signing_secret,
+            token_verification_enabled=token_verification_enabled,
+        )
         self._app.event("app_mention")(self._handle_mention)
         self._handler = SlackRequestHandler(self._app)
 
@@ -33,18 +38,19 @@ class SlackChannel:
             return
 
         thread_ts = event.get("thread_ts") or event.get("ts")
-        request = self._build_request(event, team_id)
+        request = self._build_request(event, config)
 
         pending = self._pending.get(thread_ts)
-        if pending and not pending.is_resolved:
-            pending.answers_received.append(request.text)
+        # Only use pending state if it's still awaiting clarification
+        active_clarification = pending if (pending and not pending.is_resolved) else None
+        if active_clarification:
+            active_clarification.answers_received.append(request.text)
 
-        result = self._orchestrator.process(request, config, pending)
+        result = self._orchestrator.process(request, config, active_clarification)
         self._handle_result(result, event, say)
 
-    def _build_request(self, event: dict, team_id: str) -> Request:
+    def _build_request(self, event: dict, config: ClientConfig) -> Request:
         text = event.get("text", "").replace(f"<@{self._bot_user_id}>", "").strip()
-        config = self._client_configs.get(team_id)
         return Request(
             channel=Channel.SLACK,
             sender_id=event["user"],
@@ -52,7 +58,7 @@ class SlackChannel:
             text=text,
             thread_id=event.get("thread_ts") or event.get("ts"),
             timestamp=datetime.utcnow().isoformat(),
-            client_id=config.client_id if config else "unknown",
+            client_id=config.client_id,
         )
 
     def _handle_result(self, result, event: dict, say) -> None:

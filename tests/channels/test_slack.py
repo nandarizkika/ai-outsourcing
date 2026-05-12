@@ -47,9 +47,10 @@ def test_normalizes_mention_to_request():
         bot_user_id="BOTID",
         orchestrator=orchestrator,
         client_configs={"T001": make_config()},
+        token_verification_enabled=False,
     )
 
-    request = channel._build_request(make_slack_event(), "T001")
+    request = channel._build_request(make_slack_event(), make_config())
 
     assert isinstance(request, Request)
     assert request.channel == Channel.SLACK
@@ -73,6 +74,7 @@ def test_returns_clarification_questions_as_message():
         bot_user_id="BOTID",
         orchestrator=orchestrator,
         client_configs={"T001": make_config()},
+        token_verification_enabled=False,
     )
     say = MagicMock()
     channel._handle_result(
@@ -95,6 +97,7 @@ def test_unknown_workspace_sends_error():
         bot_user_id="BOTID",
         orchestrator=orchestrator,
         client_configs={},  # no config for this workspace
+        token_verification_enabled=False,
     )
     say = MagicMock()
     channel._on_unconfigured_workspace(say=say, thread_ts="123.456")
