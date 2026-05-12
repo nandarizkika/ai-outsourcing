@@ -3,14 +3,14 @@ from sqlalchemy import create_engine, text, inspect, Engine
 import pandas as pd
 
 
-_WRITE_KEYWORDS = ("INSERT", "UPDATE", "DELETE", "DROP", "CREATE", "ALTER", "TRUNCATE")
+_READ_ONLY_PREFIXES = frozenset({"SELECT", "WITH", "EXPLAIN", "SHOW", "DESCRIBE"})
 
 
 class SQLConnector:
     def __init__(self, connection_url: str, engine: Engine | None = None):
         self._engine = engine or create_engine(connection_url)
 
-    def get_schema(self) -> dict:
+    def get_schema(self) -> dict[str, list[dict[str, str]]]:
         inspector = inspect(self._engine)
         return {
             table: [
@@ -21,9 +21,11 @@ class SQLConnector:
         }
 
     def execute(self, query: str) -> pd.DataFrame:
+        if not query.strip():
+            raise ValueError("Query must not be empty.")
         first_word = query.strip().split()[0].upper()
-        if first_word in _WRITE_KEYWORDS:
-            raise ValueError(f"Read-only access only. '{first_word}' is not permitted.")
+        if first_word not in _READ_ONLY_PREFIXES:
+            raise ValueError("Read-only access only. Only SELECT/WITH/EXPLAIN/SHOW/DESCRIBE queries are permitted.")
         with self._engine.connect() as conn:
             result = conn.execute(text(query))
             return pd.DataFrame(result.fetchall(), columns=list(result.keys()))

@@ -45,3 +45,31 @@ def test_blocks_drop(connector):
 def test_blocks_update(connector):
     with pytest.raises(ValueError, match="Read-only"):
         connector.execute("UPDATE sales SET amount = 0 WHERE id = 1")
+
+
+def test_blocks_delete(connector):
+    with pytest.raises(ValueError, match="Read-only"):
+        connector.execute("DELETE FROM sales WHERE id = 1")
+
+
+def test_blocks_create(connector):
+    with pytest.raises(ValueError, match="Read-only"):
+        connector.execute("CREATE TABLE foo (id INTEGER)")
+
+
+def test_execute_empty_result(connector):
+    df = connector.execute("SELECT * FROM sales WHERE id = 9999")
+    assert isinstance(df, pd.DataFrame)
+    assert len(df) == 0
+
+
+def test_execute_empty_query(connector):
+    with pytest.raises(ValueError, match="empty"):
+        connector.execute("   ")
+
+
+def test_get_schema_has_type_field(connector):
+    schema = connector.get_schema()
+    col = schema["sales"][0]
+    assert "type" in col
+    assert isinstance(col["type"], str)
