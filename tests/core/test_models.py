@@ -1,6 +1,6 @@
 from src.core.models import (
     Channel, SkillModule, Tier, Request, ClientConfig,
-    ClarificationState, AgentResult, Response
+    ClarificationState, AgentResult, Response, TicketRef
 )
 from datetime import datetime
 
@@ -58,3 +58,21 @@ def test_response_defaults():
     resp = Response(request_id="req-1", text="Here is your analysis.")
     assert resp.charts == []
     assert resp.assumptions == []
+
+
+def test_ticket_ref_fields():
+    ref = TicketRef(key="AI-42", url="https://jira.example.com/browse/AI-42", summary="Analyse churn")
+    assert ref.key == "AI-42"
+    assert ref.url == "https://jira.example.com/browse/AI-42"
+    assert ref.summary == "Analyse churn"
+
+
+def test_response_ticket_defaults_none():
+    r = Response(request_id="r1", text="ok")
+    assert r.ticket is None
+
+
+def test_response_ticket_accepts_ticket_ref():
+    ref = TicketRef(key="AI-1", url="https://jira.example.com/browse/AI-1", summary="x")
+    r = Response(request_id="r1", text="ok", ticket=ref)
+    assert r.ticket.key == "AI-1"

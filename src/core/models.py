@@ -71,8 +71,15 @@ class AgentResult(BaseModel):
     error: Optional[str] = None
 
 
+class TicketRef(BaseModel):
+    key: str
+    url: str
+    summary: str
+
+
 class Response(BaseModel):
     request_id: str
     text: str
     charts: list[bytes] = []
     assumptions: list[str] = []
+    ticket: Optional[TicketRef] = None
