@@ -63,11 +63,24 @@ class ClarificationState(BaseModel):
     assumptions: list[str] = []
 
 
+class ScheduledJob(BaseModel):
+    job_id: str
+    client_id: str
+    description: str
+    request_text: str
+    cron_expression: str
+    delivery_channel: Channel
+    delivery_destination: str
+    last_run: Optional[str] = None
+    last_result_summary: Optional[str] = None
+
+
 class AgentResult(BaseModel):
     agent_name: str
     success: bool
     data: Optional[dict] = None
     chart_png: Optional[bytes] = None
+    deck_pptx: Optional[bytes] = None
     error: Optional[str] = None
 
 
@@ -83,3 +96,4 @@ class Response(BaseModel):
     charts: list[bytes] = []
     assumptions: list[str] = []
     ticket: Optional[TicketRef] = None
+    deck_pptx: Optional[bytes] = None

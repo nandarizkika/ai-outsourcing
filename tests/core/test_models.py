@@ -1,6 +1,6 @@
 from src.core.models import (
     Channel, SkillModule, Tier, Request, ClientConfig,
-    ClarificationState, AgentResult, Response, TicketRef
+    ClarificationState, AgentResult, Response, TicketRef, ScheduledJob
 )
 from datetime import datetime
 
@@ -76,3 +76,35 @@ def test_response_ticket_accepts_ticket_ref():
     ref = TicketRef(key="AI-1", url="https://jira.example.com/browse/AI-1", summary="x")
     r = Response(request_id="r1", text="ok", ticket=ref)
     assert r.ticket.key == "AI-1"
+
+
+import uuid
+
+def test_scheduled_job_fields():
+    job = ScheduledJob(
+        job_id="j1",
+        client_id="client1",
+        description="Weekly revenue report",
+        request_text="Show me weekly revenue",
+        cron_expression="0 9 * * 1",
+        delivery_channel=Channel.SLACK,
+        delivery_destination="C_GENERAL",
+    )
+    assert job.job_id == "j1"
+    assert job.cron_expression == "0 9 * * 1"
+    assert job.last_run is None
+
+
+def test_agent_result_deck_pptx_defaults_none():
+    r = AgentResult(agent_name="deck_agent", success=True)
+    assert r.deck_pptx is None
+
+
+def test_response_deck_pptx_defaults_none():
+    r = Response(request_id="r1", text="ok")
+    assert r.deck_pptx is None
+
+
+def test_response_deck_pptx_accepts_bytes():
+    r = Response(request_id="r1", text="ok", deck_pptx=b"PPTX_DATA")
+    assert r.deck_pptx == b"PPTX_DATA"
