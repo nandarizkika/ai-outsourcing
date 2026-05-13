@@ -57,11 +57,13 @@ class JobScheduler:
             job.last_run = datetime.now(timezone.utc).isoformat()
             if hasattr(result, "text"):
                 job.last_result_summary = result.text[:500]
-                callback = self._callbacks.get(job_id)
-                if callback:
-                    callback(result)
+            else:
+                _logger.warning("Job %s result has no .text: %r", job_id, type(result))
+            callback = self._callbacks.get(job_id)
+            if callback:
+                callback(result)
         except Exception as exc:
-            _logger.error("Scheduled job %s failed: %s", job_id, exc)
+            _logger.error("Scheduled job %s failed: %s", job_id, exc, exc_info=True)
 
     def list_jobs(self) -> list[ScheduledJob]:
         return list(self._jobs.values())
