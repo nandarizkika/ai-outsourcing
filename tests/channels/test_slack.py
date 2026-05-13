@@ -37,6 +37,20 @@ def make_request() -> Request:
     )
 
 
+def _make_channel(ticketing=None):
+    orchestrator = MagicMock()
+    channel = SlackChannel(
+        bot_token="xoxb-fake",
+        signing_secret="fake-secret",
+        bot_user_id="BOTID",
+        orchestrator=orchestrator,
+        client_configs={"T001": make_config()},
+        token_verification_enabled=False,
+        ticketing_service=ticketing,
+    )
+    return channel, orchestrator
+
+
 def test_normalizes_mention_to_request():
     orchestrator = MagicMock()
     orchestrator.process.return_value = Response(request_id="r1", text="Here is the data.")
@@ -102,3 +116,27 @@ def test_unknown_workspace_sends_error():
     say = MagicMock()
     channel._on_unconfigured_workspace(say=say, thread_ts="123.456")
     say.assert_called_once()
+
+
+def test_ticketing_service_called_on_mention():
+    mock_ticketing = MagicMock()
+    mock_ticketing.create_for_request.return_value = MagicMock(key="AI-7", url="...", summary="x")
+    channel, mock_orchestrator = _make_channel(ticketing=mock_ticketing)
+    mock_orchestrator.process.return_value = Response(request_id="r1", text="done", charts=[])
+    event = {"user": "U123", "text": "<@BOTID> show me revenue", "channel": "C1", "ts": "1.0", "team": "T001"}
+    say = MagicMock()
+    channel._handle_mention(event, say)
+    mock_ticketing.create_for_request.assert_called_once()
+
+
+def test_ticket_key_prepended_to_reply():
+    mock_ticketing = MagicMock()
+    mock_ticketing.create_for_request.return_value = MagicMock(key="AI-99", url="...", summary="x")
+    channel, mock_orchestrator = _make_channel(ticketing=mock_ticketing)
+    mock_orchestrator.process.return_value = Response(request_id="r1", text="Analysis done", charts=[])
+    event = {"user": "U123", "text": "<@BOTID> analyse churn", "channel": "C1", "ts": "1.0", "team": "T001"}
+    say = MagicMock()
+    channel._handle_mention(event, say)
+    say_call = say.call_args
+    text_sent = say_call.kwargs.get("text") or say_call.args[0]
+    assert "AI-99" in text_sent

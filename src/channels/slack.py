@@ -16,11 +16,13 @@ class SlackChannel:
         orchestrator: Orchestrator,
         client_configs: dict[str, ClientConfig],
         token_verification_enabled: bool = True,
+        ticketing_service=None,
     ):
         self._bot_user_id = bot_user_id
         self._orchestrator = orchestrator
         self._client_configs = client_configs
         self._pending: dict[str, ClarificationState] = {}
+        self._ticketing_service = ticketing_service
 
         self._app = App(
             token=bot_token,
@@ -46,8 +48,15 @@ class SlackChannel:
         if active_clarification:
             active_clarification.answers_received.append(request.text)
 
+        ticket = None
+        if self._ticketing_service is not None:
+            try:
+                ticket = self._ticketing_service.create_for_request(request)
+            except Exception:
+                pass
+
         result = self._orchestrator.process(request, config, active_clarification)
-        self._handle_result(result, event, say)
+        self._handle_result(result, event, say, ticket=ticket)
 
     def _build_request(self, event: dict, config: ClientConfig) -> Request:
         text = event.get("text", "").replace(f"<@{self._bot_user_id}>", "").strip()
@@ -61,7 +70,7 @@ class SlackChannel:
             client_id=config.client_id,
         )
 
-    def _handle_result(self, result, event: dict, say) -> None:
+    def _handle_result(self, result, event: dict, say, ticket=None) -> None:
         thread_ts = event.get("thread_ts") or event.get("ts")
 
         if isinstance(result, ClarificationState):
@@ -73,7 +82,8 @@ class SlackChannel:
         if thread_ts in self._pending:
             del self._pending[thread_ts]
 
-        say(text=result.text, thread_ts=thread_ts)
+        reply_text = f"[{ticket.key}] {result.text}" if ticket is not None else result.text
+        say(text=reply_text, thread_ts=thread_ts)
 
         for chart_png in result.charts:
             self._app.client.files_upload_v2(
