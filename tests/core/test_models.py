@@ -78,8 +78,6 @@ def test_response_ticket_accepts_ticket_ref():
     assert r.ticket.key == "AI-1"
 
 
-import uuid
-
 def test_scheduled_job_fields():
     job = ScheduledJob(
         job_id="j1",
