@@ -86,3 +86,24 @@ def test_poll_no_unread_emails():
         mock_imap.search.return_value = ("OK", [b""])
         channel.poll_once(client_id="client1")
     mock_orchestrator.process.assert_not_called()
+
+
+def test_smtp_authenticates_with_starttls_and_login():
+    channel, mock_orchestrator = _make_channel()
+    mock_orchestrator.process.return_value = Response(
+        request_id="r1", text="ok", charts=[]
+    )
+    raw = _make_raw_email()
+    with patch("imaplib.IMAP4_SSL") as mock_imap_cls, \
+         patch("smtplib.SMTP") as mock_smtp_cls:
+        mock_imap = MagicMock()
+        mock_imap_cls.return_value.__enter__ = MagicMock(return_value=mock_imap)
+        mock_imap_cls.return_value.__exit__ = MagicMock(return_value=False)
+        mock_imap.search.return_value = ("OK", [b"1"])
+        mock_imap.fetch.return_value = ("OK", [(b"1 (RFC822 {100})", raw)])
+        mock_smtp = MagicMock()
+        mock_smtp_cls.return_value.__enter__ = MagicMock(return_value=mock_smtp)
+        mock_smtp_cls.return_value.__exit__ = MagicMock(return_value=False)
+        channel.poll_once(client_id="client1")
+    mock_smtp.starttls.assert_called_once()
+    mock_smtp.login.assert_called_once_with("dian@example.com", "secret")

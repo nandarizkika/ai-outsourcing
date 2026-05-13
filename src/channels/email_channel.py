@@ -1,14 +1,18 @@
 import email as email_lib
 import imaplib
+import logging
 import smtplib
 import uuid
 from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
+from email.utils import parseaddr
 from typing import Optional
 
 from src.core.models import Request, Channel, ClientConfig
+
+_logger = logging.getLogger(__name__)
 
 
 class EmailChannel:
@@ -50,10 +54,12 @@ class EmailChannel:
                 message_id = msg.get("Message-ID", "")
                 body = self._extract_body(msg)
                 text = f"{subject}\n\n{body}".strip() if subject else body
+                display_name, addr = parseaddr(from_addr)
+                sender_name = display_name or addr.split("@")[0]
                 request = Request(
                     channel=Channel.EMAIL,
                     sender_id=from_addr,
-                    sender_name=from_addr.split("@")[0],
+                    sender_name=sender_name,
                     text=text,
                     thread_id=message_id or None,
                     timestamp=datetime.utcnow().isoformat(),
@@ -63,8 +69,8 @@ class EmailChannel:
                 if self._ticketing:
                     try:
                         ticket = self._ticketing.create_for_request(request)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        _logger.warning("Ticketing failed: %s", exc)
                 result = self._orchestrator.process(request, config)
                 self._send_reply(from_addr, message_id, result, ticket)
 
@@ -93,4 +99,8 @@ class EmailChannel:
             img.add_header("Content-Disposition", "attachment", filename=f"chart_{i + 1}.png")
             reply.attach(img)
         with smtplib.SMTP(self._smtp_host, self._smtp_port) as smtp:
+            smtp.ehlo()
+            smtp.starttls()
+            smtp.ehlo()
+            smtp.login(self._imap_user, self._imap_password)
             smtp.sendmail(self._imap_user, to_addr, reply.as_bytes())
