@@ -9,4 +9,17 @@ class Settings(BaseSettings):
     slack_signing_secret: str
     chromadb_persist_dir: str = ".chromadb"
 
+    # Jira settings
+    jira_url: str = ""
+    jira_email: str = ""
+    jira_api_token: str = ""
+    jira_project_key: str = "AI"
+
+    # Email settings
+    email_imap_host: str = ""
+    email_imap_user: str = ""
+    email_imap_password: str = ""
+    email_smtp_host: str = ""
+    email_smtp_port: int = 587
+
     model_config = SettingsConfigDict(env_file=".env")

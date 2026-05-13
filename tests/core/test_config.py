@@ -25,3 +25,30 @@ def test_settings_has_defaults(monkeypatch):
 
     s = Settings()
     assert s.chromadb_persist_dir == ".chromadb"
+
+
+def test_jira_settings_default_empty():
+    from src.core.config import Settings
+    s = Settings(
+        anthropic_api_key="a",
+        openai_api_key="b",
+        slack_bot_token="c",
+        slack_signing_secret="d",
+    )
+    assert s.jira_url == ""
+    assert s.jira_email == ""
+    assert s.jira_api_token == ""
+    assert s.jira_project_key == "AI"
+
+
+def test_email_settings_default_empty():
+    from src.core.config import Settings
+    s = Settings(
+        anthropic_api_key="a",
+        openai_api_key="b",
+        slack_bot_token="c",
+        slack_signing_secret="d",
+    )
+    assert s.email_imap_host == ""
+    assert s.email_imap_user == ""
+    assert s.email_smtp_port == 587
