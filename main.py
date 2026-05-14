@@ -54,8 +54,6 @@ scheduler = JobScheduler(
     orchestrator=orchestrator,
     client_configs=client_configs,
 )
-scheduler.start()
-
 # Phase 2: Ticketing (Jira) — only wired when jira_url is configured
 ticketing_service = None
 if settings.jira_url:
@@ -95,6 +93,7 @@ if settings.email_imap_host:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    scheduler.start()
     yield
     scheduler.stop()
 
