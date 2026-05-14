@@ -1,6 +1,6 @@
 from src.core.models import (
     Channel, SkillModule, Tier, Request, ClientConfig,
-    ClarificationState, AgentResult, Response, TicketRef, ScheduledJob
+    ClarificationState, AgentResult, Response, TicketRef, ScheduledJob, Anomaly
 )
 from datetime import datetime
 
@@ -106,3 +106,43 @@ def test_response_deck_pptx_defaults_none():
 def test_response_deck_pptx_accepts_bytes():
     r = Response(request_id="r1", text="ok", deck_pptx=b"PPTX_DATA")
     assert r.deck_pptx == b"PPTX_DATA"
+
+
+def test_anomaly_model_fields():
+    a = Anomaly(
+        metric="churn_rate",
+        value=0.15,
+        threshold=0.10,
+        operator=">",
+        severity="critical",
+        description="churn_rate is 0.15 (rule: churn_rate > 0.1)",
+        mode="hard_rule",
+    )
+    assert a.metric == "churn_rate"
+    assert a.severity == "critical"
+    assert a.mode == "hard_rule"
+
+
+def test_anomaly_defaults():
+    a = Anomaly(metric="revenue", value=500.0, description="outlier", mode="statistical")
+    assert a.severity == "warning"
+    assert a.expected is None
+    assert a.threshold is None
+    assert a.operator is None
+
+
+def test_response_anomalies_defaults_empty():
+    r = Response(request_id="r1", text="ok")
+    assert r.anomalies == []
+
+
+def test_response_accepts_anomalies():
+    a = Anomaly(metric="x", value=1.0, description="test", mode="hard_rule")
+    r = Response(request_id="r1", text="ok", anomalies=[a])
+    assert len(r.anomalies) == 1
+    assert r.anomalies[0].metric == "x"
+
+
+def test_skill_module_has_funnel_and_cohort():
+    assert SkillModule.FUNNEL_ANALYSIS == "funnel_analysis"
+    assert SkillModule.COHORT_ANALYSIS == "cohort_analysis"

@@ -21,6 +21,8 @@ class SkillModule(str, Enum):
     STATISTICAL_ANOMALY = "statistical_anomaly"
     MACHINE_LEARNING = "machine_learning"
     PRESENTATION_BUILDING = "presentation_building"
+    FUNNEL_ANALYSIS = "funnel_analysis"
+    COHORT_ANALYSIS = "cohort_analysis"
 
 
 class Tier(str, Enum):
@@ -90,6 +92,17 @@ class TicketRef(BaseModel):
     summary: str
 
 
+class Anomaly(BaseModel):
+    metric: str
+    value: float
+    expected: Optional[float] = None
+    operator: Optional[str] = None
+    threshold: Optional[float] = None
+    severity: str = "warning"
+    description: str
+    mode: str  # "hard_rule" or "statistical"
+
+
 class Response(BaseModel):
     request_id: str
     text: str
@@ -97,3 +110,4 @@ class Response(BaseModel):
     assumptions: list[str] = []
     ticket: Optional[TicketRef] = None
     deck_pptx: Optional[bytes] = None
+    anomalies: list[Anomaly] = []
