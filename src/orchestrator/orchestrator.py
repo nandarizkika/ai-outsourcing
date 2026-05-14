@@ -8,6 +8,8 @@ from src.core.models import (
 from src.knowledge.retriever import KnowledgeRetriever
 from src.agents.sql_agent import SQLAgent
 from src.agents.chart_agent import ChartAgent
+from src.agents.ml_agent import MLAgent
+from src.agents.deck_agent import DeckAgent
 from src.orchestrator.clarifier import ClarificationChecker
 
 
@@ -19,12 +21,16 @@ class Orchestrator:
         clarifier: ClarificationChecker,
         sql_agent: SQLAgent,
         chart_agent: ChartAgent,
+        ml_agent: MLAgent | None = None,
+        deck_agent: DeckAgent | None = None,
     ):
         self._llm = llm
         self._retriever = retriever
         self._clarifier = clarifier
         self._sql_agent = sql_agent
         self._chart_agent = chart_agent
+        self._ml_agent = ml_agent
+        self._deck_agent = deck_agent
 
     def process(
         self,
@@ -52,26 +58,55 @@ class Orchestrator:
                     if chart_result.success and chart_result.chart_png:
                         charts.append(chart_result.chart_png)
 
+        # ML Agent — runs on SQL data when forecast/prediction requested
+        if (
+            plan.get("ml")
+            and self._ml_agent is not None
+            and SkillModule.MACHINE_LEARNING in config.enabled_skills
+            and sql_data
+        ):
+            ml_result = self._ml_agent.run(config.client_id, request.text, sql_data)
+            if ml_result.success and ml_result.chart_png:
+                charts.append(ml_result.chart_png)
+
         text = self._generate_response(request, context, sql_data, state.assumptions)
+
+        # Deck Agent — builds PPTX from text + charts
+        deck_pptx: bytes | None = None
+        if (
+            plan.get("deck")
+            and self._deck_agent is not None
+            and SkillModule.PRESENTATION_BUILDING in config.enabled_skills
+        ):
+            sections = [{"heading": "Analysis", "body": text}]
+            deck_result = self._deck_agent.run(
+                title=request.text[:100], sections=sections, charts=charts
+            )
+            if deck_result.success:
+                deck_pptx = deck_result.deck_pptx
 
         return Response(
             request_id=str(uuid.uuid4()),
             text=text,
             charts=charts,
             assumptions=state.assumptions,
+            deck_pptx=deck_pptx,
         )
 
     def _plan(self, request: Request, context: list[str]) -> dict:
         system = (
             "Determine which capabilities are needed to answer this data request. "
-            'Return JSON only: {"sql": true/false, "chart": true/false}'
+            "Return JSON only: "
+            '{"sql": true/false, "chart": true/false, "ml": true/false, "deck": true/false}. '
+            "Set ml=true for forecast/predict/projection/trend requests. "
+            "Set deck=true for slide/deck/presentation/powerpoint requests."
         )
         user = f"Request: {request.text}\nContext: {chr(10).join(context)}"
         raw = self._llm.complete(TaskType.SIMPLE, system, user)
         try:
             return json.loads(raw)
         except json.JSONDecodeError:
-            return {"sql": True, "chart": True}
+            return {"sql": True, "chart": True, "ml": False, "deck": False}
 
     def _generate_response(
         self,
