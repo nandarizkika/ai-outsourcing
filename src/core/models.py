@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Optional
+from typing import Literal, Optional
 from pydantic import BaseModel
 
 
@@ -100,7 +100,7 @@ class Anomaly(BaseModel):
     threshold: Optional[float] = None
     severity: str = "warning"
     description: str
-    mode: str  # "hard_rule" or "statistical"
+    mode: Literal["hard_rule", "statistical"]
 
 
 class Response(BaseModel):
