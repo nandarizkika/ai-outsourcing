@@ -11,6 +11,11 @@ from src.channels.slack import SlackChannel
 from src.channels.email_channel import EmailChannel
 from src.ticketing.jira_client import JiraClient
 from src.ticketing.ticketing_service import TicketingService
+from contextlib import asynccontextmanager
+from src.agents.ml_agent import MLAgent
+from src.agents.deck_agent import DeckAgent
+from src.jobs.scheduler import JobScheduler
+from src.core.models import ScheduledJob
 
 settings = Settings()
 llm = LLMRouter(
@@ -24,6 +29,8 @@ store = VectorStore(
 retriever = KnowledgeRetriever(store=store)
 clarifier = ClarificationChecker(llm=llm)
 chart_agent = ChartAgent()
+ml_agent = MLAgent(llm=llm)
+deck_agent = DeckAgent()
 
 # Client configs loaded here — in production, load from a config file or DB
 client_configs = {}  # workspace_team_id -> ClientConfig
@@ -32,9 +39,22 @@ orchestrator = Orchestrator(
     llm=llm,
     retriever=retriever,
     clarifier=clarifier,
-    sql_agent=None,   # injected per-client at runtime
+    sql_agent=None,
     chart_agent=chart_agent,
+    ml_agent=ml_agent,
+    deck_agent=deck_agent,
 )
+
+
+def _noop_delivery(response):
+    pass
+
+
+scheduler = JobScheduler(
+    orchestrator=orchestrator,
+    client_configs=client_configs,
+)
+scheduler.start()
 
 # Phase 2: Ticketing (Jira) — only wired when jira_url is configured
 ticketing_service = None
@@ -73,7 +93,13 @@ if settings.email_imap_host:
         ticketing_service=ticketing_service,
     )
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+    scheduler.stop()
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 @app.post("/slack/events")
@@ -84,3 +110,19 @@ async def slack_events(req: Request):
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.post("/jobs", status_code=201)
+def create_job(job: ScheduledJob):
+    scheduler.add_job(job, on_complete=_noop_delivery)
+    return {"job_id": job.job_id}
+
+
+@app.get("/jobs")
+def list_jobs():
+    return {"jobs": [j.model_dump() for j in scheduler.list_jobs()]}
+
+
+@app.delete("/jobs/{job_id}", status_code=204)
+def delete_job(job_id: str):
+    scheduler.remove_job(job_id)
