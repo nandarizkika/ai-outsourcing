@@ -30,6 +30,7 @@ def test_deck_agent_title_slide_text():
         sections=[{"heading": "Summary", "body": "All metrics are on track."}],
         charts=[],
     )
+    assert result.success is True
     prs = Presentation(io.BytesIO(result.deck_pptx))
     first_slide_text = " ".join(
         shape.text for shape in prs.slides[0].shapes if shape.has_text_frame
