@@ -8,6 +8,95 @@ from src.core.models import (
 )
 from src.agents.ml_agent import MLAgent
 from src.agents.deck_agent import DeckAgent
+from src.agents.anomaly_agent import AnomalyAgent
+from src.knowledge.interaction_memory import InteractionMemoryLogger
+from src.orchestrator.clarifier import ClarificationChecker
+from src.knowledge.retriever import KnowledgeRetriever
+from src.agents.chart_agent import ChartAgent
+
+
+def _make_orc_deps():
+    mock_llm = MagicMock()
+    mock_llm.complete.side_effect = [
+        '{"sql": true, "chart": false, "ml": false, "deck": false, "funnel": false, "cohort": false}',
+        "Analysis complete.",
+    ]
+    mock_retriever = MagicMock(spec=KnowledgeRetriever)
+    mock_retriever.search.return_value = []
+    mock_clarifier = MagicMock(spec=ClarificationChecker)
+    state = ClarificationState(original_request=_make_request())
+    state.is_resolved = True
+    mock_clarifier.check.return_value = state
+    mock_sql = MagicMock()
+    mock_sql.run.return_value = AgentResult(
+        agent_name="sql_agent", success=True,
+        data={"query": "SELECT 1", "rows": [{"churn": 0.15}], "columns": ["churn"]},
+    )
+    return dict(
+        llm=mock_llm, retriever=mock_retriever, clarifier=mock_clarifier,
+        sql_agent=mock_sql, chart_agent=ChartAgent(),
+    )
+
+
+def _make_request(text="show churn"):
+    return Request(
+        channel=Channel.SLACK, sender_id="U1", sender_name="Ana",
+        text=text, timestamp="2026-05-14T00:00:00", client_id="c1",
+    )
+
+
+def _make_config(*skills):
+    return ClientConfig(
+        client_id="c1", name="Test", tier=Tier.ADVANCED,
+        enabled_skills=list(skills), account_mode="vendor",
+        active_channels=[Channel.SLACK],
+    )
+
+
+def test_orchestrator_runs_anomaly_agent_when_skill_enabled():
+    deps = _make_orc_deps()
+    mock_anomaly = MagicMock()
+    mock_anomaly.run.return_value = AgentResult(
+        agent_name="anomaly_agent", success=True,
+        data={"anomalies": [{"metric": "churn", "value": 0.15, "severity": "critical",
+                              "description": "churn breach", "mode": "hard_rule",
+                              "expected": None, "operator": ">", "threshold": 0.1}]},
+    )
+    orc = Orchestrator(**deps, anomaly_agent=mock_anomaly)
+    result = orc.process(_make_request(), _make_config(SkillModule.SQL_QUERYING, SkillModule.HARD_RULE_ANOMALY))
+    mock_anomaly.run.assert_called_once()
+    assert isinstance(result, Response)
+    assert len(result.anomalies) == 1
+
+
+def test_orchestrator_skips_anomaly_when_skill_not_enabled():
+    deps = _make_orc_deps()
+    mock_anomaly = MagicMock()
+    orc = Orchestrator(**deps, anomaly_agent=mock_anomaly)
+    orc.process(_make_request(), _make_config(SkillModule.SQL_QUERYING))
+    mock_anomaly.run.assert_not_called()
+
+
+def test_orchestrator_calls_memory_logger():
+    deps = _make_orc_deps()
+    mock_logger = MagicMock()
+    orc = Orchestrator(**deps, memory_logger=mock_logger)
+    result = orc.process(_make_request(text="show revenue"), _make_config(SkillModule.SQL_QUERYING))
+    mock_logger.log.assert_called_once()
+    call_kwargs = mock_logger.log.call_args[1]
+    assert call_kwargs["request"].text == "show revenue"
+
+
+def test_orchestrator_funnel_mode_passes_analysis_mode_to_sql():
+    deps = _make_orc_deps()
+    deps["llm"].complete.side_effect = [
+        '{"sql": true, "chart": false, "ml": false, "deck": false, "funnel": true, "cohort": false}',
+        "Funnel analysis complete.",
+    ]
+    orc = Orchestrator(**deps)
+    orc.process(_make_request(text="show funnel"), _make_config(SkillModule.SQL_QUERYING, SkillModule.FUNNEL_ANALYSIS))
+    call_args = deps["sql_agent"].run.call_args
+    assert call_args[1].get("analysis_mode") == "funnel"
 
 
 def make_request(text: str = "show total sales by region") -> Request:

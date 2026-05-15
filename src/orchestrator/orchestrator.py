@@ -3,13 +3,15 @@ import uuid
 
 from src.core.llm import LLMRouter
 from src.core.models import (
-    TaskType, Request, Response, ClientConfig, SkillModule, ClarificationState, AgentResult
+    Anomaly, TaskType, Request, Response, ClientConfig, SkillModule, ClarificationState, AgentResult
 )
 from src.knowledge.retriever import KnowledgeRetriever
 from src.agents.sql_agent import SQLAgent
 from src.agents.chart_agent import ChartAgent
 from src.agents.ml_agent import MLAgent
 from src.agents.deck_agent import DeckAgent
+from src.agents.anomaly_agent import AnomalyAgent
+from src.knowledge.interaction_memory import InteractionMemoryLogger
 from src.orchestrator.clarifier import ClarificationChecker
 
 
@@ -23,6 +25,8 @@ class Orchestrator:
         chart_agent: ChartAgent,
         ml_agent: MLAgent | None = None,
         deck_agent: DeckAgent | None = None,
+        anomaly_agent: AnomalyAgent | None = None,
+        memory_logger: InteractionMemoryLogger | None = None,
     ):
         self._llm = llm
         self._retriever = retriever
@@ -31,6 +35,8 @@ class Orchestrator:
         self._chart_agent = chart_agent
         self._ml_agent = ml_agent
         self._deck_agent = deck_agent
+        self._anomaly_agent = anomaly_agent
+        self._memory_logger = memory_logger
 
     def process(
         self,
@@ -47,16 +53,44 @@ class Orchestrator:
         plan = self._plan(request, context)
         charts: list[bytes] = []
         sql_data: dict | None = None
+        sql_queries: list[str] = []
+        anomalies: list[dict] = []
 
         if plan.get("sql") and SkillModule.SQL_QUERYING in config.enabled_skills:
-            sql_result = self._sql_agent.run(config.client_id, request.text, context)
+            analysis_mode = None
+            if plan.get("funnel") and SkillModule.FUNNEL_ANALYSIS in config.enabled_skills:
+                analysis_mode = "funnel"
+            elif plan.get("cohort") and SkillModule.COHORT_ANALYSIS in config.enabled_skills:
+                analysis_mode = "cohort"
+            sql_result = self._sql_agent.run(
+                config.client_id, request.text, context, analysis_mode=analysis_mode
+            )
             if sql_result.success:
                 sql_data = sql_result.data
+                if sql_data and sql_data.get("query"):
+                    sql_queries.append(sql_data["query"])
 
                 if plan.get("chart") and SkillModule.DATA_VISUALIZATION in config.enabled_skills and sql_data:
                     chart_result = self._chart_agent.run(sql_data)
                     if chart_result.success and chart_result.chart_png:
                         charts.append(chart_result.chart_png)
+
+        # Anomaly detection — runs on sql_data when skill enabled
+        anomaly_skill_enabled = (
+            SkillModule.HARD_RULE_ANOMALY in config.enabled_skills
+            or SkillModule.STATISTICAL_ANOMALY in config.enabled_skills
+        )
+        if self._anomaly_agent is not None and anomaly_skill_enabled and sql_data:
+            if (SkillModule.HARD_RULE_ANOMALY in config.enabled_skills
+                    and SkillModule.STATISTICAL_ANOMALY in config.enabled_skills):
+                mode = "both"
+            elif SkillModule.HARD_RULE_ANOMALY in config.enabled_skills:
+                mode = "hard"
+            else:
+                mode = "statistical"
+            anomaly_result = self._anomaly_agent.run(config.client_id, sql_data, mode=mode)
+            if anomaly_result.success:
+                anomalies = anomaly_result.data.get("anomalies", [])
 
         # ML Agent — runs on SQL data when forecast/prediction requested
         if (
@@ -85,28 +119,43 @@ class Orchestrator:
             if deck_result.success:
                 deck_pptx = deck_result.deck_pptx
 
-        return Response(
+        response = Response(
             request_id=str(uuid.uuid4()),
             text=text,
             charts=charts,
             assumptions=state.assumptions,
             deck_pptx=deck_pptx,
+            anomalies=[Anomaly(**a) for a in anomalies],
         )
+
+        # Interaction memory — always log when logger configured
+        if self._memory_logger is not None:
+            self._memory_logger.log(
+                request=request,
+                response=response,
+                sql_queries=sql_queries,
+            )
+
+        return response
 
     def _plan(self, request: Request, context: list[str]) -> dict:
         system = (
             "Determine which capabilities are needed to answer this data request. "
             "Return JSON only: "
-            '{"sql": true/false, "chart": true/false, "ml": true/false, "deck": true/false}. '
+            '{"sql": true/false, "chart": true/false, "ml": true/false, '
+            '"deck": true/false, "funnel": true/false, "cohort": true/false}. '
             "Set ml=true for forecast/predict/projection/trend requests. "
-            "Set deck=true for slide/deck/presentation/powerpoint requests."
+            "Set deck=true for slide/deck/presentation/powerpoint requests. "
+            "Set funnel=true for funnel or conversion analysis requests. "
+            "Set cohort=true for cohort or retention analysis requests."
         )
         user = f"Request: {request.text}\nContext: {chr(10).join(context)}"
         raw = self._llm.complete(TaskType.SIMPLE, system, user)
         try:
             return json.loads(raw)
         except json.JSONDecodeError:
-            return {"sql": True, "chart": True, "ml": False, "deck": False}
+            return {"sql": True, "chart": True, "ml": False, "deck": False,
+                    "funnel": False, "cohort": False}
 
     def _generate_response(
         self,
