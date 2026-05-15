@@ -20,15 +20,13 @@ class DeckAgent:
         title: str,
         storyline: "Storyline | None" = None,
         sections: "list[dict] | None" = None,
-        charts: "list[bytes]" = [],
+        charts: "list[bytes] | None" = None,
         template_path: "str | None" = None,
         max_solutions_inline: int = 3,
     ) -> AgentResult:
-        import io as _io
-        from pptx import Presentation as _Presentation
-
+        charts = charts or []
         try:
-            prs = _Presentation(template_path) if template_path else _Presentation()
+            prs = Presentation(template_path) if template_path else Presentation()
 
             if storyline is not None:
                 self._add_title_slide(prs, title)
@@ -62,7 +60,7 @@ class DeckAgent:
                 for i, png in enumerate(charts):
                     self._add_chart_slide(prs, png, f"Chart {i + 1}")
 
-            buf = _io.BytesIO()
+            buf = io.BytesIO()
             prs.save(buf)
             buf.seek(0)
             return AgentResult(
