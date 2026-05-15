@@ -27,6 +27,11 @@ dependencies = [
     "apscheduler>=3.10,<4",
     "statsmodels>=0.14",
     "python-pptx>=0.6.21",
+    "scikit-learn>=1.4",
+    "xgboost>=2.0",
+    "lightgbm>=4.3",
+    "spacy>=3.7",
+    "sentence-transformers>=3.0",
 ]
 
 [project.optional-dependencies]

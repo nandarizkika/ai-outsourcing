@@ -23,6 +23,11 @@ class SkillModule(str, Enum):
     PRESENTATION_BUILDING = "presentation_building"
     FUNNEL_ANALYSIS = "funnel_analysis"
     COHORT_ANALYSIS = "cohort_analysis"
+    NLP_MODELING = "nlp_modeling"
+    HYPOTHESIS_TESTING = "hypothesis_testing"
+    SEGMENTATION = "segmentation"
+    AB_TESTING = "ab_testing"
+    DEEP_ANALYSIS = "deep_analysis"
 
 
 class Tier(str, Enum):
@@ -51,7 +56,7 @@ class ClientConfig(BaseModel):
     client_id: str
     name: str
     tier: Tier
-    enabled_skills: list[SkillModule]
+    enabled_skills: list[str]
     account_mode: str  # "vendor" or "dedicated"
     active_channels: list[Channel]
 
