@@ -55,3 +55,49 @@ def test_uses_tool_task_type(sql_agent):
 
     call_args = llm.complete.call_args
     assert call_args[0][0] == TaskType.TOOL
+
+
+def test_funnel_mode_adds_hint_to_system_prompt():
+    mock_llm = MagicMock()
+    mock_llm.complete.return_value = "SELECT stage, COUNT(*) FROM funnel GROUP BY stage"
+    mock_connector = MagicMock()
+    mock_connector.get_schema.return_value = {}
+    mock_connector.execute.return_value = pd.DataFrame(
+        {"stage": ["A", "B"], "count": [100, 80]}
+    )
+    mock_store = MagicMock()
+    agent = SQLAgent(llm=mock_llm, connector=mock_connector, store=mock_store)
+    agent.run("c1", "show funnel", [], analysis_mode="funnel")
+    system_prompt = mock_llm.complete.call_args[0][1]
+    assert "funnel" in system_prompt.lower()
+    assert "conversion" in system_prompt.lower()
+
+
+def test_cohort_mode_adds_hint_to_system_prompt():
+    mock_llm = MagicMock()
+    mock_llm.complete.return_value = "SELECT cohort, period, retention FROM cohorts"
+    mock_connector = MagicMock()
+    mock_connector.get_schema.return_value = {}
+    mock_connector.execute.return_value = pd.DataFrame(
+        {"cohort": ["Jan"], "period": [1], "retention": [0.8]}
+    )
+    mock_store = MagicMock()
+    agent = SQLAgent(llm=mock_llm, connector=mock_connector, store=mock_store)
+    agent.run("c1", "show cohort retention", [], analysis_mode="cohort")
+    system_prompt = mock_llm.complete.call_args[0][1]
+    assert "cohort" in system_prompt.lower()
+    assert "retention" in system_prompt.lower()
+
+
+def test_no_analysis_mode_unchanged():
+    mock_llm = MagicMock()
+    mock_llm.complete.return_value = "SELECT 1"
+    mock_connector = MagicMock()
+    mock_connector.get_schema.return_value = {}
+    mock_connector.execute.return_value = pd.DataFrame({"x": [1]})
+    mock_store = MagicMock()
+    agent = SQLAgent(llm=mock_llm, connector=mock_connector, store=mock_store)
+    agent.run("c1", "show revenue", [])
+    system_prompt = mock_llm.complete.call_args[0][1]
+    assert "funnel" not in system_prompt.lower()
+    assert "cohort" not in system_prompt.lower()

@@ -14,12 +14,30 @@ class SQLAgent:
         self._connector = connector
         self._store = store
 
-    def run(self, client_id: str, request: str, context: list[str]) -> AgentResult:
+    def run(
+        self,
+        client_id: str,
+        request: str,
+        context: list[str],
+        analysis_mode: str | None = None,
+    ) -> AgentResult:
         schema = self._connector.get_schema()
+        hint = ""
+        if analysis_mode == "funnel":
+            hint = (
+                "\nFunnel analysis: write a query that computes conversion rates "
+                "and drop-off counts for each ordered stage."
+            )
+        elif analysis_mode == "cohort":
+            hint = (
+                "\nCohort analysis: write a query that groups users by acquisition "
+                "period and computes retention rates by period offset."
+            )
         system = (
             "You are a SQL expert. Given a user request, database schema, and business context, "
             "generate a single valid read-only SQL SELECT query. "
             "Return ONLY the SQL query — no explanation, no markdown, no backticks."
+            + hint
         )
         user = (
             f"Request: {request}\n\n"
