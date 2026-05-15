@@ -60,3 +60,60 @@ def test_deck_agent_attaches_chart_image():
         for shape in slide.shapes
     )
     assert has_picture
+
+
+import json
+from unittest.mock import MagicMock
+from src.core.models import Storyline, FindingSlide, Solution
+
+
+def test_storyline_model_fields():
+    s = Storyline(
+        problem_statement="Churn increased 20% in Q2.",
+        executive_summary=["Churn up 20%", "Root cause: pricing"],
+        key_findings=[
+            FindingSlide(heading="Q2 Churn", body="Churn hit 15%.",
+                         so_what="We risk losing top cohort.", chart_index=None)
+        ],
+        solutions=[
+            Solution(title="Price rollback", description="Revert to Q1 pricing.",
+                     pros=["Quick"], cons=["Revenue impact"])
+        ],
+        recommended_solution="Price rollback",
+        recommendation_rationale="Fastest path to churn reduction.",
+        conclusion="Act within 30 days.",
+        next_steps=["Rollback pricing", "Monitor churn weekly"],
+    )
+    assert s.problem_statement == "Churn increased 20% in Q2."
+    assert len(s.key_findings) == 1
+    assert s.key_findings[0].chart_index is None
+    assert len(s.solutions) == 1
+
+
+def test_agent_result_storyline_defaults_none():
+    r = AgentResult(agent_name="deck_agent", success=True)
+    assert r.storyline is None
+
+
+def test_build_storyline_returns_storyline_object():
+    mock_llm = MagicMock()
+    mock_llm.complete.return_value = json.dumps({
+        "problem_statement": "Revenue dropped.",
+        "executive_summary": ["Revenue down 10%"],
+        "key_findings": [{"heading": "Drop", "body": "Revenue fell.", "so_what": "Action needed.", "chart_index": None}],
+        "solutions": [{"title": "Fix X", "description": "Do X.", "pros": ["fast"], "cons": ["costly"]}],
+        "recommended_solution": "Fix X",
+        "recommendation_rationale": "Fastest fix.",
+        "conclusion": "Act now.",
+        "next_steps": ["Start fix"],
+    })
+    agent = DeckAgent(llm=mock_llm)
+    storyline = agent.build_storyline(
+        analysis_text="Revenue dropped 10% in Q3.",
+        findings=["Revenue fell"],
+        solutions=[{"title": "Fix X", "description": "Do X.", "pros": ["fast"], "cons": ["costly"]}],
+        recommendation="Fix X",
+    )
+    assert isinstance(storyline, Storyline)
+    assert storyline.problem_statement == "Revenue dropped."
+    assert len(storyline.key_findings) == 1

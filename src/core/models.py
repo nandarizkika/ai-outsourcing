@@ -88,6 +88,7 @@ class AgentResult(BaseModel):
     data: Optional[dict] = None
     chart_png: Optional[bytes] = None
     deck_pptx: Optional[bytes] = None
+    storyline: Optional["Storyline"] = None
     error: Optional[str] = None
 
 
@@ -108,6 +109,31 @@ class Anomaly(BaseModel):
     mode: Literal["hard_rule", "statistical"]
 
 
+class FindingSlide(BaseModel):
+    heading: str
+    body: str
+    so_what: str
+    chart_index: Optional[int] = None
+
+
+class Solution(BaseModel):
+    title: str
+    description: str
+    pros: list[str] = []
+    cons: list[str] = []
+
+
+class Storyline(BaseModel):
+    problem_statement: str
+    executive_summary: list[str] = []
+    key_findings: list[FindingSlide] = []
+    solutions: list[Solution] = []
+    recommended_solution: str = ""
+    recommendation_rationale: str = ""
+    conclusion: str = ""
+    next_steps: list[str] = []
+
+
 class Response(BaseModel):
     request_id: str
     text: str
@@ -116,3 +142,6 @@ class Response(BaseModel):
     ticket: Optional[TicketRef] = None
     deck_pptx: Optional[bytes] = None
     anomalies: list[Anomaly] = []
+
+
+AgentResult.model_rebuild()
