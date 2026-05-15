@@ -1,7 +1,6 @@
 # tests/agents/test_spreadsheet_agent.py
 import io
 import json
-import pytest
 from unittest.mock import MagicMock
 
 import pandas as pd
