@@ -18,24 +18,58 @@ class DeckAgent:
     def run(
         self,
         title: str,
-        sections: list[dict],
-        charts: list[bytes],
-        template_path: Optional[str] = None,
+        storyline: "Storyline | None" = None,
+        sections: "list[dict] | None" = None,
+        charts: "list[bytes]" = [],
+        template_path: "str | None" = None,
+        max_solutions_inline: int = 3,
     ) -> AgentResult:
+        import io as _io
+        from pptx import Presentation as _Presentation
+
         try:
-            prs = Presentation(template_path) if template_path else Presentation()
-            self._add_title_slide(prs, title)
-            for section in sections:
-                self._add_content_slide(prs, section["heading"], section["body"])
-            for i, png in enumerate(charts):
-                self._add_chart_slide(prs, png, f"Chart {i + 1}")
-            buf = io.BytesIO()
+            prs = _Presentation(template_path) if template_path else _Presentation()
+
+            if storyline is not None:
+                self._add_title_slide(prs, title)
+                self._add_executive_summary_slide(prs, storyline)
+                self._add_problem_slide(prs, storyline.problem_statement)
+                for finding in storyline.key_findings:
+                    chart_png = (
+                        charts[finding.chart_index]
+                        if finding.chart_index is not None and finding.chart_index < len(charts)
+                        else None
+                    )
+                    self._add_finding_slide(prs, finding, chart_png)
+                matched = {f.chart_index for f in storyline.key_findings if f.chart_index is not None}
+                appendix_charts = [c for i, c in enumerate(charts) if i not in matched]
+
+                if len(storyline.solutions) <= max_solutions_inline:
+                    for sol in storyline.solutions:
+                        self._add_solution_slide(prs, sol)
+                else:
+                    self._add_solutions_table_slide(prs, storyline.solutions)
+
+                self._add_recommendation_slide(prs, storyline)
+                self._add_conclusion_slide(prs, storyline)
+
+                for i, png in enumerate(appendix_charts):
+                    self._add_chart_slide(prs, png, f"Appendix Chart {i + 1}")
+            else:
+                self._add_title_slide(prs, title)
+                for section in (sections or []):
+                    self._add_content_slide(prs, section["heading"], section["body"])
+                for i, png in enumerate(charts):
+                    self._add_chart_slide(prs, png, f"Chart {i + 1}")
+
+            buf = _io.BytesIO()
             prs.save(buf)
             buf.seek(0)
             return AgentResult(
                 agent_name="deck_agent",
                 success=True,
                 deck_pptx=buf.read(),
+                storyline=storyline,
             )
         except Exception as exc:
             _logger.error("DeckAgent failed: %s", exc, exc_info=True)
@@ -69,6 +103,118 @@ class DeckAgent:
             Inches(9),
             Inches(5.5),
         )
+
+    def _add_executive_summary_slide(self, prs, storyline) -> None:
+        from pptx.util import Inches
+        layout = prs.slide_layouts[1]
+        slide = prs.slides.add_slide(layout)
+        if slide.shapes.title:
+            slide.shapes.title.text = "Executive Summary"
+        if len(slide.placeholders) > 1:
+            tf = slide.placeholders[1].text_frame
+        else:
+            tf = slide.shapes.add_textbox(Inches(0.5), Inches(1.2), Inches(9), Inches(4)).text_frame
+        tf.clear()
+        for bullet in storyline.executive_summary:
+            p = tf.add_paragraph()
+            p.text = bullet
+            p.level = 0
+
+    def _add_problem_slide(self, prs, problem_statement: str) -> None:
+        from pptx.util import Inches
+        layout = prs.slide_layouts[1]
+        slide = prs.slides.add_slide(layout)
+        if slide.shapes.title:
+            slide.shapes.title.text = "Problem Statement"
+        if len(slide.placeholders) > 1:
+            tf = slide.placeholders[1].text_frame
+        else:
+            tf = slide.shapes.add_textbox(Inches(0.5), Inches(1.2), Inches(9), Inches(4)).text_frame
+        tf.text = problem_statement
+
+    def _add_finding_slide(self, prs, finding, chart_png) -> None:
+        import io as _io
+        from pptx.util import Inches
+        layout = prs.slide_layouts[1]
+        slide = prs.slides.add_slide(layout)
+        if slide.shapes.title:
+            slide.shapes.title.text = finding.heading
+        if chart_png:
+            slide.shapes.add_picture(_io.BytesIO(chart_png), Inches(0.3), Inches(1.2), Inches(5.5), Inches(4.5))
+            tb = slide.shapes.add_textbox(Inches(6.0), Inches(1.2), Inches(3.5), Inches(4.5))
+            tb.text_frame.text = finding.body + "\n\nSo what: " + finding.so_what
+        else:
+            if len(slide.placeholders) > 1:
+                tf = slide.placeholders[1].text_frame
+            else:
+                tf = slide.shapes.add_textbox(Inches(0.5), Inches(1.2), Inches(5.5), Inches(4)).text_frame
+            tf.text = finding.body
+            callout = slide.shapes.add_textbox(Inches(6.2), Inches(1.5), Inches(3.3), Inches(1.5))
+            callout.text_frame.text = "So what?\n" + finding.so_what
+
+    def _add_solution_slide(self, prs, solution) -> None:
+        from pptx.util import Inches
+        layout = prs.slide_layouts[1]
+        slide = prs.slides.add_slide(layout)
+        if slide.shapes.title:
+            slide.shapes.title.text = solution.title
+        if len(slide.placeholders) > 1:
+            tf = slide.placeholders[1].text_frame
+        else:
+            tf = slide.shapes.add_textbox(Inches(0.5), Inches(1.2), Inches(9), Inches(4)).text_frame
+        tf.clear()
+        p = tf.add_paragraph()
+        p.text = solution.description
+        p = tf.add_paragraph()
+        p.text = "Pros: " + ", ".join(solution.pros)
+        p = tf.add_paragraph()
+        p.text = "Cons: " + ", ".join(solution.cons)
+
+    def _add_solutions_table_slide(self, prs, solutions) -> None:
+        from pptx.util import Inches
+        layout = prs.slide_layouts[5]
+        slide = prs.slides.add_slide(layout)
+        if slide.shapes.title:
+            slide.shapes.title.text = "Solutions Comparison"
+        rows = len(solutions) + 1
+        table = slide.shapes.add_table(rows, 3, Inches(0.5), Inches(1.5), Inches(9), Inches(0.5 * rows)).table
+        for i, header in enumerate(["Solution", "Pros", "Cons"]):
+            table.cell(0, i).text = header
+        for r, sol in enumerate(solutions, start=1):
+            table.cell(r, 0).text = sol.title
+            table.cell(r, 1).text = ", ".join(sol.pros)
+            table.cell(r, 2).text = ", ".join(sol.cons)
+
+    def _add_recommendation_slide(self, prs, storyline) -> None:
+        from pptx.util import Inches
+        layout = prs.slide_layouts[1]
+        slide = prs.slides.add_slide(layout)
+        if slide.shapes.title:
+            slide.shapes.title.text = "Recommendation"
+        tb = slide.shapes.add_textbox(Inches(0.5), Inches(1.2), Inches(9), Inches(1.2))
+        tb.text_frame.text = storyline.recommended_solution
+        if storyline.recommendation_rationale:
+            tb2 = slide.shapes.add_textbox(Inches(0.5), Inches(2.8), Inches(9), Inches(2.5))
+            tb2.text_frame.text = storyline.recommendation_rationale
+
+    def _add_conclusion_slide(self, prs, storyline) -> None:
+        from pptx.util import Inches
+        layout = prs.slide_layouts[1]
+        slide = prs.slides.add_slide(layout)
+        if slide.shapes.title:
+            slide.shapes.title.text = "Conclusion & Next Steps"
+        if len(slide.placeholders) > 1:
+            tf = slide.placeholders[1].text_frame
+        else:
+            tf = slide.shapes.add_textbox(Inches(0.5), Inches(1.2), Inches(9), Inches(4)).text_frame
+        tf.clear()
+        if storyline.conclusion:
+            p = tf.add_paragraph()
+            p.text = storyline.conclusion
+        for step in storyline.next_steps:
+            p = tf.add_paragraph()
+            p.text = "• " + step
+            p.level = 1
 
     def build_storyline(
         self,
