@@ -40,10 +40,14 @@ _FORECAST_KEYWORDS = {"forecast", "predict next", "future", "trend", "projection
 _REGRESSION_KEYWORDS = {"regress", "linear model", "predict sales", "predict revenue", "correlat"}
 _ANOMALY_KEYWORDS = {"anomaly", "anomalies", "outlier", "outliers", "detect", "spike", "unusual"}
 _CLASSIFICATION_KEYWORDS = {"classif", "churn", "segment", "label", "categor"}
+_BUILD_MODEL_KEYWORDS = {"build model", "train model", "fit model", "best model"}
 
 
 def _detect_task(request: str) -> str:
     req = request.lower()
+    for kw in _BUILD_MODEL_KEYWORDS:
+        if kw in req:
+            return "build_model"
     for kw in _ANOMALY_KEYWORDS:
         if kw in req:
             return "anomaly"
@@ -76,6 +80,7 @@ class MLAgent:
         data: dict,
         task: Optional[str] = None,
         model_hint: Optional[str] = None,
+        target_col: str | None = None,
     ) -> AgentResult:
         """
         Parameters
@@ -97,6 +102,14 @@ class MLAgent:
 
         resolved_task = task or _detect_task(request)
 
+        if resolved_task == "build_model":
+            if not target_col:
+                return AgentResult(
+                    agent_name="ml_agent", success=False,
+                    error="target_col is required for build_model task",
+                )
+            return self._run_build_model(client_id, request, data, target_col)
+
         dispatch = {
             "forecast": self._run_forecast,
             "regression": self._run_regression,
@@ -105,6 +118,143 @@ class MLAgent:
         }
         handler = dispatch.get(resolved_task, self._run_forecast)
         return handler(request=request, data=data, model_hint=model_hint)
+
+    # ------------------------------------------------------------------
+    # Build Model (full ML suite: regression + classification + HPO)
+    # ------------------------------------------------------------------
+
+    def _run_build_model(self, client_id: str, request: str, data: dict, target_col: str) -> AgentResult:
+        import numpy as np
+        import pandas as pd
+        from sklearn.model_selection import cross_val_score, GridSearchCV
+        from sklearn.preprocessing import LabelEncoder
+        from sklearn.linear_model import LinearRegression, Ridge, Lasso, LogisticRegression
+        from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, RandomForestClassifier, GradientBoostingClassifier
+        from sklearn.svm import SVR, SVC
+        from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
+        from sklearn.naive_bayes import GaussianNB
+        from sklearn.neural_network import MLPRegressor, MLPClassifier
+        from sklearn.metrics import r2_score, mean_squared_error, f1_score
+        import xgboost as xgb
+        import lightgbm as lgb
+
+        df = pd.DataFrame(data["rows"])
+        if target_col not in df.columns:
+            return AgentResult(
+                agent_name="ml_agent", success=False,
+                error=f"Target column '{target_col}' not found in data",
+            )
+
+        feature_cols = [c for c in df.columns if c != target_col]
+        X = df[feature_cols].select_dtypes(include=[np.number]).values
+        y_raw = df[target_col].values
+
+        # Detect task type: classification if target is int/bool with few unique values
+        unique_vals = len(np.unique(y_raw))
+        is_classification = unique_vals <= 20 and np.issubdtype(y_raw.dtype, np.integer)
+
+        if is_classification:
+            le = LabelEncoder()
+            y = le.fit_transform(y_raw)
+            candidates = [
+                ("LogisticRegression", LogisticRegression(max_iter=500), {"C": [0.1, 1.0]}),
+                ("RandomForest", RandomForestClassifier(n_estimators=50, random_state=42), {"max_depth": [3, 5]}),
+                ("GradientBoosting", GradientBoostingClassifier(n_estimators=50, random_state=42), {"max_depth": [2, 3]}),
+                ("XGBoost", xgb.XGBClassifier(n_estimators=50, random_state=42, verbosity=0, eval_metric="logloss"), {"max_depth": [2, 3]}),
+                ("LightGBM", lgb.LGBMClassifier(n_estimators=50, random_state=42, verbose=-1), {"num_leaves": [15, 31]}),
+                ("SVC", SVC(), {"C": [0.1, 1.0]}),
+                ("KNN", KNeighborsClassifier(), {"n_neighbors": [3, 5]}),
+                ("GaussianNB", GaussianNB(), {}),
+                ("MLP", MLPClassifier(max_iter=200, random_state=42), {"hidden_layer_sizes": [(50,), (100,)]}),
+            ]
+            scorer = "f1_weighted"
+        else:
+            y = y_raw.astype(float)
+            candidates = [
+                ("LinearRegression", LinearRegression(), {}),
+                ("Ridge", Ridge(), {"alpha": [0.1, 1.0]}),
+                ("Lasso", Lasso(max_iter=2000), {"alpha": [0.01, 0.1]}),
+                ("RandomForest", RandomForestRegressor(n_estimators=50, random_state=42), {"max_depth": [3, 5]}),
+                ("GradientBoosting", GradientBoostingRegressor(n_estimators=50, random_state=42), {"max_depth": [2, 3]}),
+                ("XGBoost", xgb.XGBRegressor(n_estimators=50, random_state=42, verbosity=0), {"max_depth": [2, 3]}),
+                ("LightGBM", lgb.LGBMRegressor(n_estimators=50, random_state=42, verbose=-1), {"num_leaves": [15, 31]}),
+                ("SVR", SVR(), {"C": [0.1, 1.0]}),
+                ("KNN", KNeighborsRegressor(), {"n_neighbors": [3, 5]}),
+                ("MLPRegressor", MLPRegressor(max_iter=200, random_state=42), {"hidden_layer_sizes": [(50,), (100,)]}),
+            ]
+            scorer = "r2"
+
+        # Cross-val all candidates, pick top 3
+        cv_scores: list[tuple[float, str, object, dict]] = []
+        for name, model, params in candidates:
+            try:
+                scores = cross_val_score(model, X, y, cv=min(5, len(y) // 5), scoring=scorer)
+                cv_scores.append((float(scores.mean()), name, model, params))
+            except Exception:
+                continue
+
+        if not cv_scores:
+            return AgentResult(agent_name="ml_agent", success=False, error="All candidates failed cross-validation")
+
+        cv_scores.sort(key=lambda t: t[0], reverse=True)
+        top3 = cv_scores[:3]
+
+        # GridSearchCV on top 3
+        best_score = -1e9
+        best_name = ""
+        best_model_obj = None
+        for score, name, model, params in top3:
+            try:
+                if params:
+                    gs = GridSearchCV(model, params, cv=min(3, len(y) // 3), scoring=scorer)
+                    gs.fit(X, y)
+                    tuned_score = gs.best_score_
+                    fitted = gs.best_estimator_
+                else:
+                    model.fit(X, y)
+                    tuned_score = score
+                    fitted = model
+                if tuned_score > best_score:
+                    best_score = tuned_score
+                    best_name = name
+                    best_model_obj = fitted
+            except Exception:
+                continue
+
+        if best_model_obj is None:
+            return AgentResult(agent_name="ml_agent", success=False, error="GridSearch failed for all top candidates")
+
+        # Feature importance
+        feature_importance: dict[str, float] = {}
+        feature_names = [c for c in df.columns if c != target_col and pd.api.types.is_numeric_dtype(df[c])]
+        if hasattr(best_model_obj, "feature_importances_"):
+            fi = best_model_obj.feature_importances_
+            feature_importance = {feature_names[i]: float(fi[i]) for i in range(min(len(fi), len(feature_names)))}
+        elif hasattr(best_model_obj, "coef_"):
+            coef = best_model_obj.coef_
+            if coef.ndim > 1:
+                coef = np.abs(coef).mean(axis=0)
+            feature_importance = {feature_names[i]: float(abs(coef[i])) for i in range(min(len(coef), len(feature_names)))}
+
+        # Final metrics on training data
+        y_pred = best_model_obj.predict(X)
+        if is_classification:
+            result_data = {
+                "best_model": best_name,
+                "f1_weighted": float(f1_score(y, y_pred, average="weighted")),
+                "feature_importance": feature_importance,
+                "best_params": getattr(best_model_obj, "get_params", lambda: {})(),
+            }
+        else:
+            result_data = {
+                "best_model": best_name,
+                "r2": float(r2_score(y, y_pred)),
+                "rmse": float(np.sqrt(mean_squared_error(y, y_pred))),
+                "mae": float(np.mean(np.abs(y - y_pred))),
+                "feature_importance": feature_importance,
+                "best_params": getattr(best_model_obj, "get_params", lambda: {})(),
+            }
+        return AgentResult(agent_name="ml_agent", success=True, data=result_data)
 
     # ------------------------------------------------------------------
     # Forecasting

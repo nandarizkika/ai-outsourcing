@@ -78,3 +78,98 @@ def test_no_numeric_column_returns_error():
     )
     assert result.success is False
     assert result.error is not None
+
+
+def _tabular_regression_data():
+    import numpy as np
+    rng = np.random.default_rng(42)
+    n = 60
+    X = rng.standard_normal((n, 3))
+    y = 2 * X[:, 0] - X[:, 1] + 0.5 * X[:, 2] + rng.standard_normal(n) * 0.1
+    rows = [{"f1": float(X[i, 0]), "f2": float(X[i, 1]), "f3": float(X[i, 2]),
+             "target": float(y[i])} for i in range(n)]
+    return {"columns": ["f1", "f2", "f3", "target"], "rows": rows}
+
+
+def _tabular_classification_data():
+    import numpy as np
+    rng = np.random.default_rng(42)
+    n = 80
+    X = rng.standard_normal((n, 3))
+    y = (X[:, 0] + X[:, 1] > 0).astype(int)
+    rows = [{"f1": float(X[i, 0]), "f2": float(X[i, 1]), "f3": float(X[i, 2]),
+             "label": int(y[i])} for i in range(n)]
+    return {"columns": ["f1", "f2", "f3", "label"], "rows": rows}
+
+
+def test_build_model_regression_returns_best_model_name():
+    agent = _make_agent()
+    result = agent.run(
+        client_id="c1",
+        request="build regression model for target",
+        data=_tabular_regression_data(),
+        task="build_model",
+        target_col="target",
+    )
+    assert result.success is True
+    assert "best_model" in result.data
+    assert isinstance(result.data["best_model"], str)
+
+
+def test_build_model_regression_returns_metrics():
+    agent = _make_agent()
+    result = agent.run(
+        client_id="c1",
+        request="predict target",
+        data=_tabular_regression_data(),
+        task="build_model",
+        target_col="target",
+    )
+    assert result.success is True
+    assert "r2" in result.data
+    assert "rmse" in result.data
+    assert result.data["r2"] > 0.5
+
+
+def test_build_model_classification_returns_best_model_and_report():
+    agent = _make_agent()
+    result = agent.run(
+        client_id="c1",
+        request="classify label",
+        data=_tabular_classification_data(),
+        task="build_model",
+        target_col="label",
+    )
+    assert result.success is True
+    assert "best_model" in result.data
+    assert "f1_weighted" in result.data
+    assert result.data["f1_weighted"] > 0.5
+
+
+def test_build_model_returns_feature_importance():
+    agent = _make_agent()
+    result = agent.run(
+        client_id="c1",
+        request="predict target",
+        data=_tabular_regression_data(),
+        task="build_model",
+        target_col="target",
+    )
+    assert result.success is True
+    assert "feature_importance" in result.data
+    fi = result.data["feature_importance"]
+    assert isinstance(fi, dict)
+    assert len(fi) > 0
+
+
+def test_build_model_fails_gracefully_with_missing_target_col():
+    agent = _make_agent()
+    result = agent.run(
+        client_id="c1",
+        request="predict nonexistent",
+        data=_tabular_regression_data(),
+        task="build_model",
+        target_col="nonexistent_col",
+    )
+    assert result.success is False
+    assert result.error is not None
