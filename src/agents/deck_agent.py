@@ -88,10 +88,12 @@ class DeckAgent:
             '"recommended_solution": "str", "recommendation_rationale": "str", '
             '"conclusion": "str", "next_steps": ["str"]}'
         )
+        findings_text = "\n".join(findings)
+        solutions_text = "\n".join(s.get("title", "") for s in solutions)
         user = (
             f"Analysis:\n{analysis_text}\n\n"
-            f"Key findings:\n{chr(10).join(findings)}\n\n"
-            f"Solutions considered:\n{chr(10).join(s.get('title', '') for s in solutions)}\n\n"
+            f"Key findings:\n{findings_text}\n\n"
+            f"Solutions considered:\n{solutions_text}\n\n"
             f"Recommendation: {recommendation}"
         )
         raw = self._llm.complete(TaskType.REASONING, system, user)
@@ -107,7 +109,7 @@ class DeckAgent:
                 conclusion=data.get("conclusion", ""),
                 next_steps=data.get("next_steps", []),
             )
-        except (json.JSONDecodeError, TypeError, KeyError):
+        except (json.JSONDecodeError, TypeError, KeyError, ValueError):
             return self._fallback_storyline(analysis_text, findings, solutions, recommendation)
 
     def _fallback_storyline(

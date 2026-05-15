@@ -1,9 +1,11 @@
 import io
+import json
 import pytest
+from unittest.mock import MagicMock
 from pptx import Presentation
 
 from src.agents.deck_agent import DeckAgent
-from src.core.models import AgentResult
+from src.core.models import AgentResult, FindingSlide, Solution, Storyline
 
 
 def test_deck_agent_returns_pptx_bytes():
@@ -60,11 +62,6 @@ def test_deck_agent_attaches_chart_image():
         for shape in slide.shapes
     )
     assert has_picture
-
-
-import json
-from unittest.mock import MagicMock
-from src.core.models import Storyline, FindingSlide, Solution
 
 
 def test_storyline_model_fields():
