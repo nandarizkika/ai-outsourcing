@@ -80,15 +80,15 @@ def test_statistical_detects_outlier():
     agent = _agent_no_rules()
     data = {
         "columns": ["revenue"],
-        "rows": [
-            {"revenue": 100}, {"revenue": 102}, {"revenue": 98},
-            {"revenue": 99}, {"revenue": 101}, {"revenue": 500},
-        ],
+        "rows": (
+            [{"revenue": v} for v in [100, 102, 98, 99, 101, 100, 102, 98, 99, 101]]
+            + [{"revenue": 200}]
+        ),
     }
     result = agent.run(client_id="c1", data=data, mode="statistical")
     assert result.success is True
     anomalies = result.data["anomalies"]
-    assert any(a["value"] == 500 and a["metric"] == "revenue" for a in anomalies)
+    assert any(a["value"] == 200 and a["metric"] == "revenue" for a in anomalies)
 
 
 def test_statistical_no_anomaly_in_uniform_data():
@@ -125,11 +125,15 @@ def test_both_mode_runs_both():
         "rows": [
             {"churn_rate": 0.10, "revenue": 100},
             {"churn_rate": 0.09, "revenue": 102},
-            {"churn_rate": 0.08, "revenue": 98},
-            {"churn_rate": 0.07, "revenue": 99},
-            {"churn_rate": 0.11, "revenue": 101},
-            {"churn_rate": 0.06, "revenue": 103},
-            {"churn_rate": 0.09, "revenue": 500},
+            {"churn_rate": 0.11, "revenue": 98},
+            {"churn_rate": 0.10, "revenue": 99},
+            {"churn_rate": 0.09, "revenue": 101},
+            {"churn_rate": 0.10, "revenue": 100},
+            {"churn_rate": 0.08, "revenue": 102},
+            {"churn_rate": 0.11, "revenue": 98},
+            {"churn_rate": 0.12, "revenue": 99},
+            {"churn_rate": 0.09, "revenue": 101},
+            {"churn_rate": 0.10, "revenue": 200},
         ],
     }
     result = agent.run(client_id="c1", data=data, mode="both")

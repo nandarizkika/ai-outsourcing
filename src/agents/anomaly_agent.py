@@ -85,7 +85,7 @@ class AnomalyAgent:
                 continue
             for val in values:
                 z = abs((val - mean) / std)
-                if z > 2.0:
+                if z > 2.5:
                     anomalies.append(Anomaly(
                         metric=col,
                         value=val,
