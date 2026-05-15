@@ -40,6 +40,7 @@ _FORECAST_KEYWORDS = {"forecast", "predict next", "future", "trend", "projection
 _REGRESSION_KEYWORDS = {"regress", "linear model", "predict sales", "predict revenue", "correlat"}
 _ANOMALY_KEYWORDS = {"anomaly", "anomalies", "outlier", "outliers", "detect", "spike", "unusual"}
 _CLASSIFICATION_KEYWORDS = {"classif", "churn", "segment", "label", "categor"}
+_NLP_KEYWORDS = {"classify text", "nlp", "sentiment", "text classification", "text classify"}
 _BUILD_MODEL_KEYWORDS = {"build model", "train model", "fit model", "best model"}
 
 
@@ -51,6 +52,9 @@ def _detect_task(request: str) -> str:
     for kw in _ANOMALY_KEYWORDS:
         if kw in req:
             return "anomaly"
+    for kw in _NLP_KEYWORDS:
+        if kw in req:
+            return "nlp"
     for kw in _CLASSIFICATION_KEYWORDS:
         if kw in req:
             return "classification"
@@ -109,6 +113,9 @@ class MLAgent:
                     error="target_col is required for build_model task",
                 )
             return self._run_build_model(client_id, request, data, target_col)
+
+        if resolved_task == "nlp":
+            return self._run_nlp(client_id, request, data, target_col)
 
         dispatch = {
             "forecast": self._run_forecast,
@@ -255,6 +262,107 @@ class MLAgent:
                 "best_params": getattr(best_model_obj, "get_params", lambda: {})(),
             }
         return AgentResult(agent_name="ml_agent", success=True, data=result_data)
+
+    # ------------------------------------------------------------------
+    # NLP Classification
+    # ------------------------------------------------------------------
+
+    def _run_nlp(self, client_id: str, request: str, data: dict, target_col: str | None) -> AgentResult:
+        import numpy as np
+        import pandas as pd
+        from sklearn.feature_extraction.text import TfidfVectorizer
+        from sklearn.linear_model import LogisticRegression
+        from sklearn.ensemble import RandomForestClassifier
+        from sklearn.svm import SVC
+        from sklearn.model_selection import cross_val_score
+        from sklearn.metrics import f1_score
+        from sentence_transformers import SentenceTransformer
+
+        df = pd.DataFrame(data["rows"])
+
+        # Find text column (first string column that isn't the target)
+        text_col = None
+        for col in df.columns:
+            if col != target_col and (df[col].dtype == object or pd.api.types.is_string_dtype(df[col])):
+                text_col = col
+                break
+        if text_col is None:
+            return AgentResult(agent_name="ml_agent", success=False,
+                               error="No text column found in data")
+
+        texts = df[text_col].astype(str).tolist()
+
+        if target_col and target_col in df.columns:
+            from sklearn.preprocessing import LabelEncoder
+            le = LabelEncoder()
+            y = le.fit_transform(df[target_col].values)
+
+            classifiers = [
+                ("LogisticRegression", LogisticRegression(max_iter=500)),
+                ("RandomForest", RandomForestClassifier(n_estimators=50, random_state=42)),
+                ("SVC", SVC()),
+            ]
+
+            # TF-IDF vectorizer
+            try:
+                tfidf = TfidfVectorizer(max_features=500, ngram_range=(1, 2))
+                X_tfidf = tfidf.fit_transform(texts).toarray()
+            except ValueError as e:
+                return AgentResult(agent_name="ml_agent", success=False,
+                                   error=f"TF-IDF vectorization failed: {e}")
+
+            # Sentence embeddings
+            st_model = SentenceTransformer("all-MiniLM-L6-v2")
+            X_embed = st_model.encode(texts)
+
+            best_f1 = -1.0
+            best_vec_name = ""
+            best_clf_name = ""
+            best_clf_obj = None
+            best_X = X_tfidf
+
+            for vec_name, X in [("tfidf", X_tfidf), ("sentence_transformer", X_embed)]:
+                for clf_name, clf in classifiers:
+                    try:
+                        scores = cross_val_score(clf, X, y, cv=min(3, len(y) // 3), scoring="f1_weighted")
+                        mean_f1 = float(scores.mean())
+                        if mean_f1 > best_f1:
+                            best_f1 = mean_f1
+                            best_vec_name = vec_name
+                            best_clf_name = clf_name
+                            best_clf_obj = clf
+                            best_X = X
+                    except Exception:
+                        continue
+
+            if best_clf_obj is None:
+                return AgentResult(agent_name="ml_agent", success=False,
+                                   error="All NLP classifiers failed")
+
+            best_clf_obj.fit(best_X, y)
+            y_pred = best_clf_obj.predict(best_X)
+            return AgentResult(
+                agent_name="ml_agent",
+                success=True,
+                data={
+                    "best_vectorizer": best_vec_name,
+                    "best_classifier": best_clf_name,
+                    "f1_weighted": float(f1_score(y, y_pred, average="weighted")),
+                    "text_col": text_col,
+                    "target_col": target_col,
+                },
+            )
+
+        # No target — return basic text stats
+        return AgentResult(
+            agent_name="ml_agent",
+            success=True,
+            data={
+                "text_col": text_col,
+                "sample_count": len(texts),
+                "avg_length": float(np.mean([len(t.split()) for t in texts])),
+            },
+        )
 
     # ------------------------------------------------------------------
     # Forecasting

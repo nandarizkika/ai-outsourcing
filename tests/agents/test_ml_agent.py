@@ -173,3 +173,58 @@ def test_build_model_fails_gracefully_with_missing_target_col():
     )
     assert result.success is False
     assert result.error is not None
+
+
+def _nlp_classification_data():
+    texts = [
+        "The product is amazing and I love it", "Great service, very satisfied",
+        "Excellent quality, highly recommend", "Best purchase I have made",
+        "Good value for money", "Really happy with this",
+        "Terrible product, broke immediately", "Awful experience, very disappointed",
+        "Worst purchase ever, complete waste", "Poor quality, do not buy",
+        "Very bad service", "Disappointed with the result",
+    ]
+    labels = [1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0]
+    rows = [{"text": t, "label": l} for t, l in zip(texts, labels)]
+    return {"columns": ["text", "label"], "rows": rows}
+
+
+def test_nlp_classify_returns_best_pipeline():
+    agent = _make_agent()
+    result = agent.run(
+        client_id="c1",
+        request="classify sentiment",
+        data=_nlp_classification_data(),
+        task="nlp",
+        target_col="label",
+    )
+    assert result.success is True
+    assert "best_vectorizer" in result.data
+    assert "best_classifier" in result.data
+    assert "f1_weighted" in result.data
+
+
+def test_nlp_classify_f1_above_chance():
+    agent = _make_agent()
+    result = agent.run(
+        client_id="c1",
+        request="classify text",
+        data=_nlp_classification_data(),
+        task="nlp",
+        target_col="label",
+    )
+    assert result.success is True
+    assert result.data["f1_weighted"] > 0.5
+
+
+def test_nlp_missing_text_col_returns_failure():
+    agent = _make_agent()
+    result = agent.run(
+        client_id="c1",
+        request="classify",
+        data={"columns": ["no_text_col", "label"], "rows": [{"no_text_col": "x", "label": 1}]},
+        task="nlp",
+        target_col="label",
+    )
+    assert result.success is False
+    assert result.error is not None
