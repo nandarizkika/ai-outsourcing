@@ -50,6 +50,7 @@ class AnomalyAgent:
                         or (op == ">=" and value >= threshold)
                         or (op == "<" and value < threshold)
                         or (op == "<=" and value <= threshold)
+                        or (op == "==" and value == threshold)
                     )
                     if breached:
                         anomalies.append(Anomaly(

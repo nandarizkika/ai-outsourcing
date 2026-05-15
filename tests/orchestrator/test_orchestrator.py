@@ -103,8 +103,11 @@ def test_orchestrator_funnel_mode_passes_analysis_mode_to_sql():
 
 def test_funnel_returns_clarification_when_no_kb_definition():
     deps = _make_orc_deps()
-    # retriever.search returns [] for funnel query
-    deps["retriever"].search.return_value = []
+    def search_side_effect(client_id, query):
+        if "funnel" in query.lower():
+            return []
+        return []  # general context also empty in this test
+    deps["retriever"].search.side_effect = search_side_effect
     deps["llm"].complete.side_effect = [
         '{"sql": true, "chart": false, "ml": false, "deck": false, "funnel": true, "cohort": false}',
     ]

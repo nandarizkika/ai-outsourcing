@@ -54,6 +54,7 @@ def test_hard_rule_all_operators():
         (">=", 5, 5, True), (">=", 4, 5, False),
         ("<", 3, 4, True), ("<", 5, 4, False),
         ("<=", 4, 4, True), ("<=", 5, 4, False),
+        ("==", 5, 5, True), ("==", 4, 5, False),
     ]:
         agent = _agent_with_rules({"metric": "m", "operator": op, "threshold": threshold})
         result = agent.run("c1", {"columns": ["m"], "rows": [{"m": val}]}, mode="hard")
