@@ -14,6 +14,8 @@ from src.ticketing.ticketing_service import TicketingService
 from contextlib import asynccontextmanager
 from src.agents.ml_agent import MLAgent
 from src.agents.deck_agent import DeckAgent
+from src.agents.anomaly_agent import AnomalyAgent
+from src.knowledge.interaction_memory import InteractionMemoryLogger
 from src.jobs.scheduler import JobScheduler
 from src.core.models import ScheduledJob
 
@@ -31,6 +33,8 @@ clarifier = ClarificationChecker(llm=llm)
 chart_agent = ChartAgent()
 ml_agent = MLAgent(llm=llm)
 deck_agent = DeckAgent()
+anomaly_agent = AnomalyAgent(retriever=retriever)
+memory_logger = InteractionMemoryLogger(store=store)
 
 # Client configs loaded here — in production, load from a config file or DB
 client_configs = {}  # workspace_team_id -> ClientConfig
@@ -43,6 +47,8 @@ orchestrator = Orchestrator(
     chart_agent=chart_agent,
     ml_agent=ml_agent,
     deck_agent=deck_agent,
+    anomaly_agent=anomaly_agent,
+    memory_logger=memory_logger,
 )
 
 
