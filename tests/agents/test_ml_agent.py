@@ -222,7 +222,7 @@ def test_nlp_missing_text_col_returns_failure():
     result = agent.run(
         client_id="c1",
         request="classify",
-        data={"columns": ["no_text_col", "label"], "rows": [{"no_text_col": "x", "label": 1}]},
+        data={"columns": ["x", "label"], "rows": [{"x": 1.0, "label": 1}, {"x": 2.0, "label": 0}]},
         task="nlp",
         target_col="label",
     )
