@@ -56,6 +56,25 @@ class Orchestrator:
         sql_queries: list[str] = []
         anomalies: list[dict] = []
 
+        # Funnel: look up stages in KB first; clarify if not defined
+        if (
+            plan.get("funnel")
+            and SkillModule.FUNNEL_ANALYSIS in config.enabled_skills
+        ):
+            funnel_docs = self._retriever.search(
+                config.client_id, "funnel stages conversion steps flow"
+            )
+            if funnel_docs:
+                context = context + funnel_docs[:2]
+            else:
+                funnel_state = ClarificationState(original_request=request)
+                funnel_state.questions_asked = [
+                    "I don't have your funnel stages defined. What are the conversion steps? "
+                    "(e.g., Visit → Signup → Active User → Paid Customer)"
+                ]
+                funnel_state.is_resolved = False
+                return funnel_state
+
         if plan.get("sql") and SkillModule.SQL_QUERYING in config.enabled_skills:
             analysis_mode = None
             if plan.get("funnel") and SkillModule.FUNNEL_ANALYSIS in config.enabled_skills:

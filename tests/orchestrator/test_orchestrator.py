@@ -93,10 +93,54 @@ def test_orchestrator_funnel_mode_passes_analysis_mode_to_sql():
         '{"sql": true, "chart": false, "ml": false, "deck": false, "funnel": true, "cohort": false}',
         "Funnel analysis complete.",
     ]
+    # retriever returns funnel docs so we don't get a clarification
+    deps["retriever"].search.return_value = ["Visit -> Signup -> Active -> Paid"]
     orc = Orchestrator(**deps)
     orc.process(_make_request(text="show funnel"), _make_config(SkillModule.SQL_QUERYING, SkillModule.FUNNEL_ANALYSIS))
     call_args = deps["sql_agent"].run.call_args
     assert call_args[1].get("analysis_mode") == "funnel"
+
+
+def test_funnel_returns_clarification_when_no_kb_definition():
+    deps = _make_orc_deps()
+    # retriever.search returns [] for funnel query
+    deps["retriever"].search.return_value = []
+    deps["llm"].complete.side_effect = [
+        '{"sql": true, "chart": false, "ml": false, "deck": false, "funnel": true, "cohort": false}',
+    ]
+    orc = Orchestrator(**deps)
+    result = orc.process(
+        _make_request(text="show funnel"),
+        _make_config(SkillModule.SQL_QUERYING, SkillModule.FUNNEL_ANALYSIS),
+    )
+    assert isinstance(result, ClarificationState)
+    assert "funnel" in result.questions_asked[0].lower()
+
+
+def test_funnel_injects_kb_definition_into_context():
+    deps = _make_orc_deps()
+    # retriever.search returns funnel definition on second call (first call is general context)
+    call_count = {"n": 0}
+    def search_side_effect(client_id, query):
+        call_count["n"] += 1
+        if "funnel" in query.lower():
+            return ["Visit -> Signup -> Active -> Paid"]
+        return []
+    deps["retriever"].search.side_effect = search_side_effect
+    deps["llm"].complete.side_effect = [
+        '{"sql": true, "chart": false, "ml": false, "deck": false, "funnel": true, "cohort": false}',
+        "Funnel analysis complete.",
+    ]
+    orc = Orchestrator(**deps)
+    result = orc.process(
+        _make_request(text="show funnel"),
+        _make_config(SkillModule.SQL_QUERYING, SkillModule.FUNNEL_ANALYSIS),
+    )
+    assert isinstance(result, Response)
+    # SQL agent should have been called with context that includes funnel definition
+    call_args = deps["sql_agent"].run.call_args
+    sql_context = call_args[0][2]  # positional arg 3
+    assert any("Visit" in c for c in sql_context)
 
 
 def make_request(text: str = "show total sales by region") -> Request:
