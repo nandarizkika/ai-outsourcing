@@ -1,8 +1,7 @@
 # tests/test_integration_phase6.py
 import io
 import json
-from unittest.mock import MagicMock, patch
-import pytest
+from unittest.mock import MagicMock
 from pptx import Presentation
 
 from src.orchestrator.orchestrator import Orchestrator
@@ -52,7 +51,6 @@ def _make_request(text, client_id="c1"):
 
 
 def _make_orchestrator(llm, **agents):
-    from src.knowledge.retriever import KnowledgeRetriever
     from src.agents.chart_agent import ChartAgent
     from src.agents.sql_agent import SQLAgent
     mock_retriever = MagicMock()
