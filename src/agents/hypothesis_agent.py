@@ -18,7 +18,7 @@ class HypothesisAgent:
                                    error="No data provided")
 
             cat_cols = [c for c in df.columns
-                        if df[c].dtype == object or df[c].nunique() <= 5]
+                        if df[c].dtype == object or pd.api.types.is_string_dtype(df[c])]
             num_cols = [c for c in df.columns
                         if pd.api.types.is_numeric_dtype(df[c])]
 

@@ -60,7 +60,12 @@ def test_llm_interpretation_included():
 
 def test_too_few_rows_returns_error():
     agent = _make_agent()
-    data = {"columns": ["group", "metric"], "rows": [{"group": "A", "metric": 1.0}]}
+    # Group A has 1 observation — size guard triggers
+    data = {
+        "columns": ["group", "metric"],
+        "rows": [{"group": "A", "metric": 1.0}] +
+                [{"group": "B", "metric": float(i)} for i in range(3)],
+    }
     result = agent.run("c1", "Compare", data)
     assert result.success is False
     assert result.error is not None
