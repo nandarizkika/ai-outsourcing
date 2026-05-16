@@ -82,3 +82,32 @@ def test_no_control_group_returns_error():
     result = agent.run("c1", "test", data)
     assert result.success is False
     assert result.error is not None
+
+
+def test_three_group_experiment_returns_error():
+    agent = _make_agent()
+    data = {
+        "columns": ["variant", "metric"],
+        "rows": (
+            [{"variant": "control", "metric": float(i)} for i in range(10)] +
+            [{"variant": "treatment_A", "metric": float(i)} for i in range(10)] +
+            [{"variant": "treatment_B", "metric": float(i)} for i in range(10)]
+        ),
+    }
+    result = agent.run("c1", "3-arm trial", data)
+    assert result.success is False
+    assert result.error is not None
+
+
+def test_control2_as_only_variant_returns_error():
+    agent = _make_agent()
+    data = {
+        "columns": ["variant", "metric"],
+        "rows": (
+            [{"variant": "control", "metric": float(i)} for i in range(10)] +
+            [{"variant": "control2", "metric": float(i)} for i in range(10)]
+        ),
+    }
+    result = agent.run("c1", "control vs control2", data)
+    assert result.success is False
+    assert result.error is not None

@@ -34,7 +34,15 @@ class ABTestingAgent:
             metric_col = num_cols[0]
             groups = df[variant_col].unique()
             control_label = next(g for g in groups if str(g).lower() == "control")
-            variant_label = next(g for g in groups if str(g).lower() != "control")
+            non_control = [g for g in groups if str(g).lower() != "control"]
+            if len(non_control) != 1:
+                return AgentResult(agent_name="ab_agent", success=False,
+                                   error=f"Expected exactly 1 non-control group, found {len(non_control)}: {list(non_control)}")
+            # Check if the variant is also a control variant (e.g., control2)
+            variant_label = non_control[0]
+            if str(variant_label).lower().startswith("control"):
+                return AgentResult(agent_name="ab_agent", success=False,
+                                   error=f"Variant group '{variant_label}' appears to be a control variant, not a treatment group")
 
             control_data = df[df[variant_col] == control_label][metric_col].dropna().values
             variant_data = df[df[variant_col] == variant_label][metric_col].dropna().values
