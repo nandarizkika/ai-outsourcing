@@ -194,16 +194,25 @@ class Orchestrator:
 
         text = self._generate_response(request, context, sql_data, state.assumptions)
 
-        # Deck Agent — builds PPTX from text + charts
+        # Deck Agent — builds PPTX via storyline (LLM) or fallback flat sections
         deck_pptx: bytes | None = None
         if (
             plan.get("deck")
             and self._deck_agent is not None
             and SkillModule.PRESENTATION_BUILDING in config.enabled_skills
         ):
-            sections = [{"heading": "Analysis", "body": text}]
+            findings = (
+                [f"{r}" for r in (sql_data.get("rows", []) or [])[:5]]
+                if sql_data else []
+            )
+            storyline = self._deck_agent.build_storyline(
+                analysis_text=text,
+                findings=findings,
+                solutions=[],
+                recommendation="",
+            )
             deck_result = self._deck_agent.run(
-                title=request.text[:100], sections=sections, charts=charts
+                title=request.text[:100], storyline=storyline, charts=charts
             )
             if deck_result.success:
                 deck_pptx = deck_result.deck_pptx
