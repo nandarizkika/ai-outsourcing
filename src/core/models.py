@@ -50,6 +50,8 @@ class Request(BaseModel):
     thread_id: Optional[str] = None
     timestamp: str
     client_id: str
+    file_bytes: Optional[bytes] = None
+    filename: Optional[str] = None
 
 
 class ClientConfig(BaseModel):
@@ -142,6 +144,21 @@ class Response(BaseModel):
     ticket: Optional[TicketRef] = None
     deck_pptx: Optional[bytes] = None
     anomalies: list[Anomaly] = []
+
+
+class StepRecord(BaseModel):
+    step: int
+    thought: str
+    tool: str
+    tool_input: dict
+    observation: str
+
+
+class AnalystResult(AgentResult):
+    steps: list[StepRecord] = []
+    findings: list[str] = []
+    solutions: list[dict] = []
+    recommendation: str = ""
 
 
 AgentResult.model_rebuild()
