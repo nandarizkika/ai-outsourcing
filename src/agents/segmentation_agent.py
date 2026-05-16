@@ -66,7 +66,7 @@ class SegmentationAgent:
             ax.set_title(f"Customer Segmentation (k={best_k})")
             ax.legend()
             buf = io.BytesIO()
-            plt.savefig(buf, format="png", dpi=100, bbox_inches="tight")
+            fig.savefig(buf, format="png", dpi=100, bbox_inches="tight")
             plt.close(fig)
             buf.seek(0)
             chart_png = buf.read()

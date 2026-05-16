@@ -69,3 +69,4 @@ def test_too_few_rows_returns_error():
     data = {"columns": ["x", "y"], "rows": [{"x": 1.0, "y": 2.0}]}
     result = agent.run("c1", "Segment", data)
     assert result.success is False
+    assert result.error is not None
