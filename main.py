@@ -15,6 +15,8 @@ from contextlib import asynccontextmanager
 from src.agents.ml_agent import MLAgent
 from src.agents.deck_agent import DeckAgent
 from src.agents.anomaly_agent import AnomalyAgent
+from src.agents.analyst_agent import AnalystAgent
+from src.agents.spreadsheet_agent import SpreadsheetAgent
 from src.knowledge.interaction_memory import InteractionMemoryLogger
 from src.jobs.scheduler import JobScheduler
 from src.core.models import ScheduledJob
@@ -35,6 +37,8 @@ ml_agent = MLAgent(llm=llm)
 deck_agent = DeckAgent()
 anomaly_agent = AnomalyAgent(retriever=retriever)
 memory_logger = InteractionMemoryLogger(store=store)
+analyst_agent = AnalystAgent(llm=llm, sql_agent=None, retriever=retriever, ml_agent=ml_agent)
+spreadsheet_agent = SpreadsheetAgent(llm=llm)
 
 # Client configs loaded here — in production, load from a config file or DB
 client_configs = {}  # workspace_team_id -> ClientConfig
@@ -49,6 +53,8 @@ orchestrator = Orchestrator(
     deck_agent=deck_agent,
     anomaly_agent=anomaly_agent,
     memory_logger=memory_logger,
+    analyst_agent=analyst_agent,
+    spreadsheet_agent=spreadsheet_agent,
 )
 
 

@@ -3,7 +3,8 @@ import uuid
 
 from src.core.llm import LLMRouter
 from src.core.models import (
-    Anomaly, TaskType, Request, Response, ClientConfig, SkillModule, ClarificationState, AgentResult
+    Anomaly, TaskType, Request, Response, ClientConfig, SkillModule,
+    ClarificationState, AgentResult, AnalystResult,
 )
 from src.knowledge.retriever import KnowledgeRetriever
 from src.agents.sql_agent import SQLAgent
@@ -11,6 +12,8 @@ from src.agents.chart_agent import ChartAgent
 from src.agents.ml_agent import MLAgent
 from src.agents.deck_agent import DeckAgent
 from src.agents.anomaly_agent import AnomalyAgent
+from src.agents.analyst_agent import AnalystAgent
+from src.agents.spreadsheet_agent import SpreadsheetAgent
 from src.knowledge.interaction_memory import InteractionMemoryLogger
 from src.orchestrator.clarifier import ClarificationChecker
 
@@ -27,6 +30,8 @@ class Orchestrator:
         deck_agent: DeckAgent | None = None,
         anomaly_agent: AnomalyAgent | None = None,
         memory_logger: InteractionMemoryLogger | None = None,
+        analyst_agent: AnalystAgent | None = None,
+        spreadsheet_agent: SpreadsheetAgent | None = None,
     ):
         self._llm = llm
         self._retriever = retriever
@@ -37,24 +42,89 @@ class Orchestrator:
         self._deck_agent = deck_agent
         self._anomaly_agent = anomaly_agent
         self._memory_logger = memory_logger
+        self._analyst_agent = analyst_agent
+        self._spreadsheet_agent = spreadsheet_agent
+
+    def _detect_deep_intent(self, request: Request) -> bool:
+        system = (
+            "Does this request ask for root-cause analysis, deep investigation, "
+            "or a complex multi-step analytical inquiry? "
+            "Return only 'true' or 'false'."
+        )
+        raw = self._llm.complete(TaskType.SIMPLE, system, f"Request: {request.text}")
+        return raw.strip().lower().startswith("true")
 
     def process(
         self,
         request: Request,
         config: ClientConfig,
         clarification_state: ClarificationState | None = None,
-    ) -> Response | ClarificationState:
+    ) -> "Response | ClarificationState | AnalystResult":
         context = self._retriever.search(config.client_id, request.text)
+
+        # Deep dive confirmation flow
+        if (
+            self._analyst_agent is not None
+            and SkillModule.DEEP_ANALYSIS in config.enabled_skills
+            and clarification_state is not None
+            and clarification_state.deep_dive_pending
+            and (
+                clarification_state.deep_dive_confirmed
+                or any(
+                    a.strip().lower() in ("yes", "y", "sure", "go ahead", "ok", "yep")
+                    for a in clarification_state.answers_received
+                )
+            )
+        ):
+            checkpoints: list[str] = []
+            return self._analyst_agent.run_deep(
+                request=request,
+                config=config,
+                on_checkpoint=lambda step, thought: checkpoints.append(f"Step {step}: {thought}"),
+            )
+
         state = self._clarifier.check(request, context, clarification_state)
 
         if not state.is_resolved:
             return state
+
+        # Deep intent detection — only on first call (no existing clarification_state)
+        if (
+            self._analyst_agent is not None
+            and SkillModule.DEEP_ANALYSIS in config.enabled_skills
+            and clarification_state is None
+            and self._detect_deep_intent(request)
+        ):
+            deep_state = ClarificationState(original_request=request)
+            deep_state.questions_asked = [
+                "Want me to do a deep dive on this? It may take a few minutes. "
+                "Reply yes to proceed or no for a quick answer."
+            ]
+            deep_state.deep_dive_pending = True
+            deep_state.is_resolved = False
+            return deep_state
 
         plan = self._plan(request, context)
         charts: list[bytes] = []
         sql_data: dict | None = None
         sql_queries: list[str] = []
         anomalies: list[dict] = []
+
+        # Spreadsheet routing — takes priority over SQL if file attached
+        if (
+            request.file_bytes is not None
+            and request.filename is not None
+            and self._spreadsheet_agent is not None
+            and SkillModule.SPREADSHEET_ANALYSIS in config.enabled_skills
+        ):
+            sheet_result = self._spreadsheet_agent.run(
+                file_bytes=request.file_bytes,
+                filename=request.filename,
+                question=request.text,
+                config=config,
+            )
+            if sheet_result.success:
+                sql_data = sheet_result.data
 
         # Funnel: look up stages in KB first; clarify if not defined
         if (
@@ -171,10 +241,13 @@ class Orchestrator:
         user = f"Request: {request.text}\nContext: {chr(10).join(context)}"
         raw = self._llm.complete(TaskType.SIMPLE, system, user)
         try:
-            return json.loads(raw)
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict):
+                return parsed
         except json.JSONDecodeError:
-            return {"sql": True, "chart": True, "ml": False, "deck": False,
-                    "funnel": False, "cohort": False}
+            pass
+        return {"sql": True, "chart": True, "ml": False, "deck": False,
+                "funnel": False, "cohort": False}
 
     def _generate_response(
         self,

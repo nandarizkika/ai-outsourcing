@@ -70,6 +70,8 @@ class ClarificationState(BaseModel):
     answers_received: list[str] = []
     is_resolved: bool = False
     assumptions: list[str] = []
+    deep_dive_pending: bool = False
+    deep_dive_confirmed: bool = False
 
 
 class ScheduledJob(BaseModel):
