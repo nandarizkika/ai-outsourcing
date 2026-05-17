@@ -9,7 +9,7 @@ from src.knowledge.vector_store import VectorStore
 
 
 class SQLAgent:
-    def __init__(self, llm: LLMRouter, connector: SQLConnector, store: VectorStore):
+    def __init__(self, llm: LLMRouter, connector: SQLConnector, store=None):
         self._llm = llm
         self._connector = connector
         self._store = store
@@ -50,12 +50,13 @@ class SQLAgent:
 
         try:
             df = self._connector.execute(sql)
-            self._store.add(
-                client_id,
-                [f"Successful SQL for: {request}\nQuery: {sql}"],
-                [str(uuid.uuid4())],
-                [{"type": "sql_template", "client_id": client_id}],
-            )
+            if self._store is not None:
+                self._store.add(
+                    client_id,
+                    [f"Successful SQL for: {request}\nQuery: {sql}"],
+                    [str(uuid.uuid4())],
+                    [{"type": "sql_template", "client_id": client_id}],
+                )
             return AgentResult(
                 agent_name="sql_agent",
                 success=True,

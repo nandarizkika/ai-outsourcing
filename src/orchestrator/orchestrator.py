@@ -18,6 +18,7 @@ from src.agents.hypothesis_agent import HypothesisAgent
 from src.agents.segmentation_agent import SegmentationAgent
 from src.agents.ab_agent import ABTestingAgent
 from src.knowledge.interaction_memory import InteractionMemoryLogger
+from src.core.client_registry import ClientRegistry
 from src.orchestrator.clarifier import ClarificationChecker
 
 
@@ -27,8 +28,8 @@ class Orchestrator:
         llm: LLMRouter,
         retriever: KnowledgeRetriever,
         clarifier: ClarificationChecker,
-        sql_agent: SQLAgent,
-        chart_agent: ChartAgent,
+        sql_agent: SQLAgent | None = None,
+        chart_agent: ChartAgent | None = None,
         ml_agent: MLAgent | None = None,
         deck_agent: DeckAgent | None = None,
         anomaly_agent: AnomalyAgent | None = None,
@@ -38,6 +39,7 @@ class Orchestrator:
         hypothesis_agent: HypothesisAgent | None = None,
         segmentation_agent: SegmentationAgent | None = None,
         ab_agent: ABTestingAgent | None = None,
+        registry: ClientRegistry | None = None,
     ):
         self._llm = llm
         self._retriever = retriever
@@ -53,6 +55,7 @@ class Orchestrator:
         self._hypothesis_agent = hypothesis_agent
         self._segmentation_agent = segmentation_agent
         self._ab_agent = ab_agent
+        self._registry = registry
 
     def _detect_deep_intent(self, request: Request) -> bool:
         system = (
@@ -160,18 +163,26 @@ class Orchestrator:
                 analysis_mode = "funnel"
             elif plan.get("cohort") and SkillModule.COHORT_ANALYSIS in config.enabled_skills:
                 analysis_mode = "cohort"
-            sql_result = self._sql_agent.run(
-                config.client_id, request.text, context, analysis_mode=analysis_mode
-            )
-            if sql_result.success:
-                sql_data = sql_result.data
-                if sql_data and sql_data.get("query"):
-                    sql_queries.append(sql_data["query"])
 
-                if plan.get("chart") and SkillModule.DATA_VISUALIZATION in config.enabled_skills and sql_data:
-                    chart_result = self._chart_agent.run(sql_data)
-                    if chart_result.success and chart_result.chart_png:
-                        charts.append(chart_result.chart_png)
+            sql_agent = self._sql_agent
+            if self._registry is not None:
+                connector = self._registry.get_connector(config.client_id)
+                if connector is not None:
+                    sql_agent = SQLAgent(llm=self._llm, connector=connector)
+
+            if sql_agent is not None:
+                sql_result = sql_agent.run(
+                    config.client_id, request.text, context, analysis_mode=analysis_mode
+                )
+                if sql_result.success:
+                    sql_data = sql_result.data
+                    if sql_data and sql_data.get("query"):
+                        sql_queries.append(sql_data["query"])
+
+                    if plan.get("chart") and SkillModule.DATA_VISUALIZATION in config.enabled_skills and sql_data:
+                        chart_result = self._chart_agent.run(sql_data)
+                        if chart_result.success and chart_result.chart_png:
+                            charts.append(chart_result.chart_png)
 
         # Anomaly detection — runs on sql_data when skill enabled
         anomaly_skill_enabled = (
