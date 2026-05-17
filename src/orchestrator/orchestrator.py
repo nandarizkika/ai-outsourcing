@@ -14,6 +14,9 @@ from src.agents.deck_agent import DeckAgent
 from src.agents.anomaly_agent import AnomalyAgent
 from src.agents.analyst_agent import AnalystAgent
 from src.agents.spreadsheet_agent import SpreadsheetAgent
+from src.agents.hypothesis_agent import HypothesisAgent
+from src.agents.segmentation_agent import SegmentationAgent
+from src.agents.ab_agent import ABTestingAgent
 from src.knowledge.interaction_memory import InteractionMemoryLogger
 from src.orchestrator.clarifier import ClarificationChecker
 
@@ -32,6 +35,9 @@ class Orchestrator:
         memory_logger: InteractionMemoryLogger | None = None,
         analyst_agent: AnalystAgent | None = None,
         spreadsheet_agent: SpreadsheetAgent | None = None,
+        hypothesis_agent: HypothesisAgent | None = None,
+        segmentation_agent: SegmentationAgent | None = None,
+        ab_agent: ABTestingAgent | None = None,
     ):
         self._llm = llm
         self._retriever = retriever
@@ -44,6 +50,9 @@ class Orchestrator:
         self._memory_logger = memory_logger
         self._analyst_agent = analyst_agent
         self._spreadsheet_agent = spreadsheet_agent
+        self._hypothesis_agent = hypothesis_agent
+        self._segmentation_agent = segmentation_agent
+        self._ab_agent = ab_agent
 
     def _detect_deep_intent(self, request: Request) -> bool:
         system = (
@@ -192,6 +201,41 @@ class Orchestrator:
             if ml_result.success and ml_result.chart_png:
                 charts.append(ml_result.chart_png)
 
+        # Hypothesis testing — runs on sql_data when skill enabled
+        if (
+            plan.get("hypothesis")
+            and self._hypothesis_agent is not None
+            and SkillModule.HYPOTHESIS_TESTING in config.enabled_skills
+            and sql_data
+        ):
+            hyp_result = self._hypothesis_agent.run(config.client_id, request.text, sql_data)
+            if hyp_result.success:
+                sql_data = {**(sql_data or {}), **hyp_result.data}
+
+        # Segmentation — runs on sql_data when skill enabled
+        if (
+            plan.get("segment")
+            and self._segmentation_agent is not None
+            and SkillModule.SEGMENTATION in config.enabled_skills
+            and sql_data
+        ):
+            seg_result = self._segmentation_agent.run(config.client_id, request.text, sql_data)
+            if seg_result.success:
+                if seg_result.chart_png:
+                    charts.append(seg_result.chart_png)
+                sql_data = {**(sql_data or {}), **seg_result.data}
+
+        # A/B testing — runs on sql_data when skill enabled
+        if (
+            plan.get("ab_test")
+            and self._ab_agent is not None
+            and SkillModule.AB_TESTING in config.enabled_skills
+            and sql_data
+        ):
+            ab_result = self._ab_agent.run(config.client_id, request.text, sql_data)
+            if ab_result.success:
+                sql_data = {**(sql_data or {}), **ab_result.data}
+
         text = self._generate_response(request, context, sql_data, state.assumptions)
 
         # Deck Agent — builds PPTX via storyline (LLM) or fallback flat sections
@@ -241,11 +285,15 @@ class Orchestrator:
             "Determine which capabilities are needed to answer this data request. "
             "Return JSON only: "
             '{"sql": true/false, "chart": true/false, "ml": true/false, '
-            '"deck": true/false, "funnel": true/false, "cohort": true/false}. '
+            '"deck": true/false, "funnel": true/false, "cohort": true/false, '
+            '"hypothesis": true/false, "segment": true/false, "ab_test": true/false}. '
             "Set ml=true for forecast/predict/projection/trend requests. "
             "Set deck=true for slide/deck/presentation/powerpoint requests. "
             "Set funnel=true for funnel or conversion analysis requests. "
-            "Set cohort=true for cohort or retention analysis requests."
+            "Set cohort=true for cohort or retention analysis requests. "
+            "Set hypothesis=true for hypothesis test/statistical significance/p-value/compare groups requests. "
+            "Set segment=true for customer segmentation/clustering/group customers requests. "
+            "Set ab_test=true for A/B test/experiment/variant evaluation requests."
         )
         user = f"Request: {request.text}\nContext: {chr(10).join(context)}"
         raw = self._llm.complete(TaskType.SIMPLE, system, user)
@@ -256,7 +304,8 @@ class Orchestrator:
         except json.JSONDecodeError:
             pass
         return {"sql": True, "chart": True, "ml": False, "deck": False,
-                "funnel": False, "cohort": False}
+                "funnel": False, "cohort": False,
+                "hypothesis": False, "segment": False, "ab_test": False}
 
     def _generate_response(
         self,
