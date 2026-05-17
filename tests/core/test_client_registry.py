@@ -74,6 +74,15 @@ def test_get_connector_caches_instance(tmp_path):
     assert conn1 is conn2
 
 
+def test_upsert_with_new_url_evicts_connector(tmp_path):
+    reg = ClientRegistry(str(tmp_path / "clients.json"))
+    reg.upsert(_make_config("c1", database_url="sqlite:///a.db"))
+    conn1 = reg.get_connector("c1")
+    reg.upsert(_make_config("c1", database_url="sqlite:///b.db"))
+    conn2 = reg.get_connector("c1")
+    assert conn1 is not conn2
+
+
 def test_delete_evicts_connector_cache(tmp_path):
     reg = ClientRegistry(str(tmp_path / "clients.json"))
     reg.upsert(_make_config("c1", database_url="sqlite:///:memory:"))

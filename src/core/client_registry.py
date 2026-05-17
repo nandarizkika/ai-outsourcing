@@ -35,6 +35,7 @@ class ClientRegistry:
             data = self._load()
             data[config.client_id] = config.model_dump()
             self._save(data)
+            self._connectors.pop(config.client_id, None)
 
     def delete(self, client_id: str) -> None:
         with self._lock:
