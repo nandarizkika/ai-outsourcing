@@ -19,6 +19,7 @@ from src.agents.segmentation_agent import SegmentationAgent
 from src.agents.ab_agent import ABTestingAgent
 from src.knowledge.interaction_memory import InteractionMemoryLogger
 from src.core.client_registry import ClientRegistry
+from src.agents.report_agent import ReportAgent
 from src.orchestrator.clarifier import ClarificationChecker
 
 
@@ -40,6 +41,7 @@ class Orchestrator:
         segmentation_agent: SegmentationAgent | None = None,
         ab_agent: ABTestingAgent | None = None,
         registry: ClientRegistry | None = None,
+        report_agent: ReportAgent | None = None,
     ):
         self._llm = llm
         self._retriever = retriever
@@ -56,6 +58,7 @@ class Orchestrator:
         self._segmentation_agent = segmentation_agent
         self._ab_agent = ab_agent
         self._registry = registry
+        self._report_agent = report_agent
 
     def _detect_deep_intent(self, request: Request) -> bool:
         system = (
@@ -249,6 +252,27 @@ class Orchestrator:
 
         text = self._generate_response(request, context, sql_data, state.assumptions)
 
+        # Report Agent — formats analysis into Markdown + HTML when skill enabled
+        report_markdown: str | None = None
+        report_html: str | None = None
+        if (
+            plan.get("report")
+            and self._report_agent is not None
+            and SkillModule.REPORT_GENERATION in config.enabled_skills
+        ):
+            report_result = self._report_agent.run(
+                config.client_id,
+                request.text,
+                {
+                    "analysis_text": text,
+                    "sql_rows": (sql_data.get("rows", []) or [])[:10] if sql_data else [],
+                    "anomalies": anomalies,
+                },
+            )
+            if report_result.success:
+                report_markdown = report_result.data["markdown"]
+                report_html = report_result.data["html"]
+
         # Deck Agent — builds PPTX via storyline (LLM) or fallback flat sections
         deck_pptx: bytes | None = None
         if (
@@ -279,6 +303,8 @@ class Orchestrator:
             assumptions=state.assumptions,
             deck_pptx=deck_pptx,
             anomalies=[Anomaly(**a) for a in anomalies],
+            report_markdown=report_markdown,
+            report_html=report_html,
         )
 
         # Interaction memory — always log when logger configured
@@ -297,14 +323,16 @@ class Orchestrator:
             "Return JSON only: "
             '{"sql": true/false, "chart": true/false, "ml": true/false, '
             '"deck": true/false, "funnel": true/false, "cohort": true/false, '
-            '"hypothesis": true/false, "segment": true/false, "ab_test": true/false}. '
+            '"hypothesis": true/false, "segment": true/false, "ab_test": true/false, '
+            '"report": true/false}. '
             "Set ml=true for forecast/predict/projection/trend requests. "
             "Set deck=true for slide/deck/presentation/powerpoint requests. "
             "Set funnel=true for funnel or conversion analysis requests. "
             "Set cohort=true for cohort or retention analysis requests. "
             "Set hypothesis=true for hypothesis test/statistical significance/p-value/compare groups requests. "
             "Set segment=true for customer segmentation/clustering/group customers requests. "
-            "Set ab_test=true for A/B test/experiment/variant evaluation requests."
+            "Set ab_test=true for A/B test/experiment/variant evaluation requests. "
+            "Set report=true for generate report/weekly summary/send me a report requests."
         )
         user = f"Request: {request.text}\nContext: {chr(10).join(context)}"
         raw = self._llm.complete(TaskType.SIMPLE, system, user)
@@ -316,7 +344,8 @@ class Orchestrator:
             pass
         return {"sql": True, "chart": True, "ml": False, "deck": False,
                 "funnel": False, "cohort": False,
-                "hypothesis": False, "segment": False, "ab_test": False}
+                "hypothesis": False, "segment": False, "ab_test": False,
+                "report": False}
 
     def _generate_response(
         self,
