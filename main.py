@@ -22,7 +22,12 @@ from src.agents.segmentation_agent import SegmentationAgent
 from src.agents.ab_agent import ABTestingAgent
 from src.knowledge.interaction_memory import InteractionMemoryLogger
 from src.jobs.scheduler import JobScheduler
-from src.core.models import ScheduledJob
+from src.core.models import ScheduledJob, ClientConfig, ClarificationState
+from src.core.client_registry import ClientRegistry
+from src.agents.report_agent import ReportAgent
+from fastapi import HTTPException
+from pydantic import BaseModel as PydanticBaseModel
+from typing import Optional as OptionalType
 
 settings = Settings()
 llm = LLMRouter(
@@ -46,8 +51,27 @@ hypothesis_agent = HypothesisAgent(llm=llm)
 segmentation_agent = SegmentationAgent(llm=llm)
 ab_agent = ABTestingAgent(llm=llm)
 
-# Client configs loaded here — in production, load from a config file or DB
-client_configs = {}  # workspace_team_id -> ClientConfig
+registry = ClientRegistry(settings.clients_file)
+
+
+class RegistryAdapter(dict):
+    def __getitem__(self, key):
+        cfg = registry.get(key)
+        if cfg is None:
+            raise KeyError(key)
+        return cfg
+
+    def __contains__(self, key):
+        return registry.get(key) is not None
+
+    def get(self, key, default=None):
+        cfg = registry.get(key)
+        return cfg if cfg is not None else default
+
+
+client_configs = RegistryAdapter()
+
+report_agent = ReportAgent(llm=llm)
 
 orchestrator = Orchestrator(
     llm=llm,
@@ -64,6 +88,8 @@ orchestrator = Orchestrator(
     hypothesis_agent=hypothesis_agent,
     segmentation_agent=segmentation_agent,
     ab_agent=ab_agent,
+    registry=registry,
+    report_agent=report_agent,
 )
 
 
@@ -120,6 +146,49 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+from src.core.models import Request as AnalystRequest
+
+
+class AnalyzeBody(PydanticBaseModel):
+    request: AnalystRequest
+    clarification_state: OptionalType[ClarificationState] = None
+
+
+@app.post("/clients", status_code=201)
+def create_client(config: ClientConfig):
+    registry.upsert(config)
+    return config.model_dump()
+
+
+@app.get("/clients")
+def list_clients():
+    return {"clients": [c.model_dump() for c in registry.all()]}
+
+
+@app.get("/clients/{client_id}")
+def get_client(client_id: str):
+    config = registry.get(client_id)
+    if config is None:
+        raise HTTPException(status_code=404, detail="Client not found")
+    return config.model_dump()
+
+
+@app.delete("/clients/{client_id}", status_code=204)
+def delete_client(client_id: str):
+    registry.delete(client_id)
+
+
+@app.post("/analyze")
+def analyze(body: AnalyzeBody):
+    config = registry.get(body.request.client_id)
+    if config is None:
+        raise HTTPException(status_code=404, detail="Client not found")
+    result = orchestrator.process(body.request, config, body.clarification_state)
+    if hasattr(result, "model_dump"):
+        return result.model_dump()
+    return {"result": str(result)}
 
 
 @app.post("/slack/events")
