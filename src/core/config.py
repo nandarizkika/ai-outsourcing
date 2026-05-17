@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     slack_bot_token: str
     slack_signing_secret: str
     chromadb_persist_dir: str = ".chromadb"
+    clients_file: str = "clients.json"
 
     # Jira settings
     jira_url: str = ""

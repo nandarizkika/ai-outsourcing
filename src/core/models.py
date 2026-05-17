@@ -61,6 +61,7 @@ class ClientConfig(BaseModel):
     enabled_skills: list[str]
     account_mode: str  # "vendor" or "dedicated"
     active_channels: list[Channel]
+    database_url: Optional[str] = None
 
 
 class ClarificationState(BaseModel):
@@ -146,6 +147,8 @@ class Response(BaseModel):
     ticket: Optional[TicketRef] = None
     deck_pptx: Optional[bytes] = None
     anomalies: list[Anomaly] = []
+    report_markdown: Optional[str] = None
+    report_html: Optional[str] = None
 
 
 class StepRecord(BaseModel):
