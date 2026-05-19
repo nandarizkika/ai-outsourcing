@@ -104,3 +104,18 @@ class EmailChannel:
             smtp.ehlo()
             smtp.login(self._imap_user, self._imap_password)
             smtp.sendmail(self._imap_user, to_addr, reply.as_bytes())
+
+    def send_email(self, to_addr: str, subject: str, html_body: str) -> None:
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
+        msg = MIMEMultipart("alternative")
+        msg["From"] = self._imap_user
+        msg["To"] = to_addr
+        msg["Subject"] = subject
+        msg.attach(MIMEText(html_body, "html"))
+        with smtplib.SMTP(self._smtp_host, self._smtp_port) as smtp:
+            smtp.ehlo()
+            smtp.starttls()
+            smtp.ehlo()
+            smtp.login(self._imap_user, self._imap_password)
+            smtp.sendmail(self._imap_user, to_addr, msg.as_bytes())

@@ -101,3 +101,6 @@ class SlackChannel:
 
     def get_handler(self) -> SlackRequestHandler:
         return self._handler
+
+    def send_message(self, channel: str, text: str) -> None:
+        self._app.client.chat_postMessage(channel=channel, text=text)

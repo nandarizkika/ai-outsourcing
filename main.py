@@ -23,6 +23,7 @@ from src.agents.ab_agent import ABTestingAgent
 from src.knowledge.interaction_memory import InteractionMemoryLogger
 from src.jobs.scheduler import JobScheduler
 from src.core.models import ScheduledJob, ClientConfig, ClarificationState
+from src.jobs.delivery import deliver
 from src.core.client_registry import ClientRegistry
 from src.agents.report_agent import ReportAgent
 from fastapi import HTTPException
@@ -91,10 +92,6 @@ orchestrator = Orchestrator(
     registry=registry,
     report_agent=report_agent,
 )
-
-
-def _noop_delivery(response):
-    pass
 
 
 scheduler = JobScheduler(
@@ -201,9 +198,15 @@ def health():
     return {"status": "ok"}
 
 
+def make_deliver():
+    def _deliver(job, response):
+        deliver(job, response, slack_channel=slack, email_channel=email_channel)
+    return _deliver
+
+
 @app.post("/jobs", status_code=201)
 def create_job(job: ScheduledJob):
-    scheduler.add_job(job, on_complete=_noop_delivery)
+    scheduler.add_job(job, on_complete=make_deliver())
     return {"job_id": job.job_id}
 
 

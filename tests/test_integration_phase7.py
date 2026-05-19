@@ -115,3 +115,66 @@ def test_orchestrator_uses_registry_connector_over_sql_agent():
 
     mock_registry.get_connector.assert_called_once_with("c1")
     assert hasattr(result, "text")
+
+
+def test_deliver_routes_to_slack_channel():
+    from src.jobs.delivery import deliver
+    from src.core.models import ScheduledJob, Channel, Response
+
+    mock_slack = MagicMock()
+    job = ScheduledJob(
+        job_id="j1", client_id="c1", description="Weekly report",
+        request_text="Give me the weekly summary",
+        cron_expression="0 9 * * 1",
+        delivery_channel=Channel.SLACK,
+        delivery_destination="C123456",
+    )
+    response = Response(
+        request_id="r1", text="Analysis done.",
+        report_markdown="## Summary\n- Revenue up",
+        report_html="<h2>Summary</h2>",
+    )
+    deliver(job, response, slack_channel=mock_slack)
+    mock_slack.send_message.assert_called_once_with("C123456", "## Summary\n- Revenue up")
+
+
+def test_deliver_routes_to_email_channel():
+    from src.jobs.delivery import deliver
+    from src.core.models import ScheduledJob, Channel, Response
+
+    mock_email = MagicMock()
+    job = ScheduledJob(
+        job_id="j2", client_id="c1", description="Weekly report",
+        request_text="Weekly summary",
+        cron_expression="0 9 * * 1",
+        delivery_channel=Channel.EMAIL,
+        delivery_destination="user@example.com",
+    )
+    response = Response(
+        request_id="r2", text="Analysis done.",
+        report_markdown="## Summary",
+        report_html="<h2>Summary</h2>",
+    )
+    deliver(job, response, email_channel=mock_email)
+    mock_email.send_email.assert_called_once_with(
+        to_addr="user@example.com",
+        subject="Weekly report",
+        html_body="<h2>Summary</h2>",
+    )
+
+
+def test_deliver_falls_back_to_text_when_no_report():
+    from src.jobs.delivery import deliver
+    from src.core.models import ScheduledJob, Channel, Response
+
+    mock_slack = MagicMock()
+    job = ScheduledJob(
+        job_id="j3", client_id="c1", description="Report",
+        request_text="Summary",
+        cron_expression="0 9 * * 1",
+        delivery_channel=Channel.SLACK,
+        delivery_destination="C999",
+    )
+    response = Response(request_id="r3", text="Plain text result.")
+    deliver(job, response, slack_channel=mock_slack)
+    mock_slack.send_message.assert_called_once_with("C999", "Plain text result.")
