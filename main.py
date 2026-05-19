@@ -1,5 +1,5 @@
 # main.py
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from src.core.config import Settings
 from src.core.llm import LLMRouter
 from src.knowledge.vector_store import VectorStore
@@ -29,8 +29,10 @@ from src.agents.report_agent import ReportAgent
 from fastapi import HTTPException
 from pydantic import BaseModel as PydanticBaseModel
 from typing import Optional as OptionalType
+from src.core.auth import make_verify_api_key
 
 settings = Settings()
+verify_api_key = make_verify_api_key(settings)
 llm = LLMRouter(
     anthropic_api_key=settings.anthropic_api_key,
     openai_api_key=settings.openai_api_key,
@@ -153,18 +155,18 @@ class AnalyzeBody(PydanticBaseModel):
     clarification_state: OptionalType[ClarificationState] = None
 
 
-@app.post("/clients", status_code=201)
+@app.post("/clients", status_code=201, dependencies=[Depends(verify_api_key)])
 def create_client(config: ClientConfig):
     registry.upsert(config)
     return config.model_dump()
 
 
-@app.get("/clients")
+@app.get("/clients", dependencies=[Depends(verify_api_key)])
 def list_clients():
     return {"clients": [c.model_dump() for c in registry.all()]}
 
 
-@app.get("/clients/{client_id}")
+@app.get("/clients/{client_id}", dependencies=[Depends(verify_api_key)])
 def get_client(client_id: str):
     config = registry.get(client_id)
     if config is None:
@@ -172,12 +174,12 @@ def get_client(client_id: str):
     return config.model_dump()
 
 
-@app.delete("/clients/{client_id}", status_code=204)
+@app.delete("/clients/{client_id}", status_code=204, dependencies=[Depends(verify_api_key)])
 def delete_client(client_id: str):
     registry.delete(client_id)
 
 
-@app.post("/analyze")
+@app.post("/analyze", dependencies=[Depends(verify_api_key)])
 def analyze(body: AnalyzeBody):
     config = registry.get(body.request.client_id)
     if config is None:
@@ -204,17 +206,17 @@ def make_deliver():
     return _deliver
 
 
-@app.post("/jobs", status_code=201)
+@app.post("/jobs", status_code=201, dependencies=[Depends(verify_api_key)])
 def create_job(job: ScheduledJob):
     scheduler.add_job(job, on_complete=make_deliver())
     return {"job_id": job.job_id}
 
 
-@app.get("/jobs")
+@app.get("/jobs", dependencies=[Depends(verify_api_key)])
 def list_jobs():
     return {"jobs": [j.model_dump() for j in scheduler.list_jobs()]}
 
 
-@app.delete("/jobs/{job_id}", status_code=204)
+@app.delete("/jobs/{job_id}", status_code=204, dependencies=[Depends(verify_api_key)])
 def delete_job(job_id: str):
     scheduler.remove_job(job_id)
