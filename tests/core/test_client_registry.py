@@ -107,3 +107,37 @@ def test_client_config_accepts_connector_type_and_config(tmp_path):
     result = reg.get("c1")
     assert result.connector_type == "postgres"
     assert result.connector_config["host"] == "localhost"
+
+
+def test_get_connector_uses_connector_type_when_set(tmp_path):
+    from unittest.mock import patch, MagicMock
+    reg = ClientRegistry(str(tmp_path / "clients.json"))
+    config = _make_config(
+        "c1",
+        connector_type="postgres",
+        connector_config={"host": "localhost", "database": "mydb", "user": "u", "password": "p"},
+    )
+    reg.upsert(config)
+    mock_connector = MagicMock()
+    with patch("src.core.client_registry.ConnectorFactory.create", return_value=mock_connector) as mock_create:
+        result = reg.get_connector("c1")
+    assert result is mock_connector
+    mock_create.assert_called_once_with(
+        "postgres", {"host": "localhost", "database": "mydb", "user": "u", "password": "p"}
+    )
+
+
+def test_get_connector_connector_type_takes_priority_over_database_url(tmp_path):
+    from unittest.mock import patch, MagicMock
+    reg = ClientRegistry(str(tmp_path / "clients.json"))
+    config = _make_config(
+        "c1",
+        database_url="sqlite:///:memory:",
+        connector_type="mysql",
+        connector_config={"host": "localhost", "database": "mydb", "user": "u", "password": "p"},
+    )
+    reg.upsert(config)
+    mock_connector = MagicMock()
+    with patch("src.core.client_registry.ConnectorFactory.create", return_value=mock_connector):
+        result = reg.get_connector("c1")
+    assert result is mock_connector

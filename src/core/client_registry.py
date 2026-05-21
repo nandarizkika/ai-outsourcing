@@ -1,6 +1,7 @@
 import json
 import threading
 
+from src.connectors.factory import ConnectorFactory
 from src.connectors.sql import SQLConnector
 from src.core.models import ClientConfig
 
@@ -53,9 +54,14 @@ class ClientRegistry:
             raw = self._load().get(client_id)
             if raw is None:
                 return None
-            db_url = raw.get("database_url")
-            if not db_url:
-                return None
             if client_id not in self._connectors:
-                self._connectors[client_id] = SQLConnector(connection_url=db_url)
+                connector_type = raw.get("connector_type")
+                connector_config = raw.get("connector_config")
+                db_url = raw.get("database_url")
+                if connector_type and connector_config is not None:
+                    self._connectors[client_id] = ConnectorFactory.create(connector_type, connector_config)
+                elif db_url:
+                    self._connectors[client_id] = SQLConnector(connection_url=db_url)
+                else:
+                    return None
             return self._connectors[client_id]
