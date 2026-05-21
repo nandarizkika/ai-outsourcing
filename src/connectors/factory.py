@@ -1,4 +1,6 @@
 # src/connectors/factory.py
+from urllib.parse import quote_plus
+
 from sqlalchemy import create_engine
 
 from src.connectors.sql import SQLConnector
@@ -6,14 +8,14 @@ from src.connectors.sql import SQLConnector
 
 def _postgres_url(cfg: dict) -> str:
     return (
-        f"postgresql+psycopg2://{cfg['user']}:{cfg['password']}"
+        f"postgresql+psycopg2://{quote_plus(cfg['user'])}:{quote_plus(cfg['password'])}"
         f"@{cfg['host']}:{cfg.get('port', 5432)}/{cfg['database']}"
     )
 
 
 def _mysql_url(cfg: dict) -> str:
     return (
-        f"mysql+pymysql://{cfg['user']}:{cfg['password']}"
+        f"mysql+pymysql://{quote_plus(cfg['user'])}:{quote_plus(cfg['password'])}"
         f"@{cfg['host']}:{cfg.get('port', 3306)}/{cfg['database']}"
     )
 
@@ -25,7 +27,7 @@ def _bigquery_url(cfg: dict) -> str:
 def _snowflake_url(cfg: dict) -> str:
     schema = cfg.get("schema", "PUBLIC")
     return (
-        f"snowflake://{cfg['user']}:{cfg['password']}"
+        f"snowflake://{quote_plus(cfg['user'])}:{quote_plus(cfg['password'])}"
         f"@{cfg['account']}/{cfg['database']}/{schema}"
         f"?warehouse={cfg['warehouse']}"
     )

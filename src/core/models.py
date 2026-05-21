@@ -62,7 +62,7 @@ class ClientConfig(BaseModel):
     account_mode: str  # "vendor" or "dedicated"
     active_channels: list[Channel]
     database_url: Optional[str] = None
-    connector_type: Optional[str] = None
+    connector_type: Optional[Literal["postgres", "mysql", "bigquery", "snowflake"]] = None
     connector_config: Optional[dict] = None
 
 

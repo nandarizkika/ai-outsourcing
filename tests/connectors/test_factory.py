@@ -75,3 +75,22 @@ def test_snowflake_custom_schema():
 def test_unknown_type_raises_value_error():
     with pytest.raises(ValueError, match="Unknown connector_type"):
         ConnectorFactory.create("oracle", {})
+
+
+def test_postgres_encodes_special_chars_in_password():
+    _, mock_engine = _create("postgres", {
+        "host": "localhost", "database": "mydb", "user": "admin", "password": "p@ss/w0rd?"
+    })
+    url = mock_engine.call_args[0][0]
+    assert "p%40ss%2Fw0rd%3F" in url
+    assert "p@ss/w0rd?" not in url
+
+
+def test_snowflake_encodes_special_chars_in_password():
+    _, mock_engine = _create("snowflake", {
+        "account": "myaccount", "user": "admin", "password": "p@ss/w0rd?",
+        "warehouse": "COMPUTE_WH", "database": "mydb"
+    })
+    url = mock_engine.call_args[0][0]
+    assert "p%40ss%2Fw0rd%3F" in url
+    assert "p@ss/w0rd?" not in url

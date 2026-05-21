@@ -32,6 +32,19 @@ def test_response_report_html_defaults_to_none():
     assert r.report_html is None
 
 
+def test_client_config_rejects_invalid_connector_type():
+    import pytest
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError):
+        ClientConfig(**_base_config(connector_type="oracle"))
+
+
+def test_client_config_accepts_valid_connector_types():
+    for ct in ("postgres", "mysql", "bigquery", "snowflake"):
+        config = ClientConfig(**_base_config(connector_type=ct))
+        assert config.connector_type == ct
+
+
 def test_settings_clients_file_default():
     import os
     os.environ.setdefault("ANTHROPIC_API_KEY", "x")
