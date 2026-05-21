@@ -30,6 +30,8 @@ from fastapi import HTTPException
 from pydantic import BaseModel as PydanticBaseModel
 from typing import Optional as OptionalType
 from src.core.auth import make_verify_api_key
+from src.core.logging_config import configure_logging
+from src.middleware.logging import RequestLoggingMiddleware
 
 settings = Settings()
 verify_api_key = make_verify_api_key(settings)
@@ -137,6 +139,9 @@ if settings.email_imap_host:
         ticketing_service=ticketing_service,
     )
 
+configure_logging()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     scheduler.start()
@@ -145,6 +150,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+app.add_middleware(RequestLoggingMiddleware)
 
 
 from src.core.models import Request as AnalystRequest
