@@ -36,6 +36,7 @@ dependencies = [
     "spacy>=3.7",
     "sentence-transformers>=3.0",
     "snowflake-sqlalchemy>=1.5",
+    "python-json-logger>=2.0",
 ]
 
 [project.optional-dependencies]
