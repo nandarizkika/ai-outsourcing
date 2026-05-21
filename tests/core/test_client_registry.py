@@ -6,7 +6,7 @@ from src.core.client_registry import ClientRegistry
 from src.core.models import ClientConfig, Tier, Channel
 
 
-def _make_config(client_id="c1", database_url=None):
+def _make_config(client_id="c1", database_url=None, connector_type=None, connector_config=None):
     return ClientConfig(
         client_id=client_id,
         name=f"Client {client_id}",
@@ -15,6 +15,8 @@ def _make_config(client_id="c1", database_url=None):
         account_mode="vendor",
         active_channels=[Channel.SLACK],
         database_url=database_url,
+        connector_type=connector_type,
+        connector_config=connector_config,
     )
 
 
@@ -91,3 +93,17 @@ def test_delete_evicts_connector_cache(tmp_path):
     reg.upsert(_make_config("c1", database_url="sqlite:///:memory:"))
     conn2 = reg.get_connector("c1")
     assert conn1 is not conn2
+
+
+def test_client_config_accepts_connector_type_and_config(tmp_path):
+    reg = ClientRegistry(str(tmp_path / "clients.json"))
+    config = ClientConfig(
+        client_id="c1", name="Client c1", tier=Tier.BASIC,
+        enabled_skills=[], account_mode="vendor", active_channels=[Channel.SLACK],
+        connector_type="postgres",
+        connector_config={"host": "localhost", "database": "mydb", "user": "u", "password": "p"},
+    )
+    reg.upsert(config)
+    result = reg.get("c1")
+    assert result.connector_type == "postgres"
+    assert result.connector_config["host"] == "localhost"
