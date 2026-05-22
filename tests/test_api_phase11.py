@@ -101,3 +101,25 @@ def test_analyze_accepts_correct_client_key(client, monkeypatch):
     )
     assert resp.status_code == 200
     assert resp.json()["text"] == "Analysis complete."
+
+
+def test_analyze_rejects_mismatched_client_id(client, monkeypatch):
+    client_key = "correctkey" * 6
+    config = ClientConfig(
+        client_id="c1", name="Test Co", tier=Tier.BASIC,
+        enabled_skills=[], account_mode="vendor", active_channels=[Channel.SLACK],
+        api_key=client_key,
+    )
+    monkeypatch.setattr(main_module.registry, "get", lambda client_id: config)
+    payload = {
+        "request": {
+            "channel": "slack", "sender_id": "u1", "sender_name": "User",
+            "text": "Show revenue", "timestamp": "2026-05-19T00:00:00Z", "client_id": "c2",
+        },
+        "clarification_state": None,
+    }
+    resp = client.post(
+        "/analyze", json=payload,
+        headers={"X-Client-ID": "c1", "X-API-Key": client_key},
+    )
+    assert resp.status_code == 403
