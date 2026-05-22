@@ -94,7 +94,7 @@ def test_delete_client_returns_204(client, monkeypatch):
 
 # --- /analyze route tests ---
 
-def test_analyze_unknown_client_returns_404(client, monkeypatch):
+def test_analyze_wrong_credentials_returns_401(client, monkeypatch):
     monkeypatch.setattr(main_module.registry, "get", lambda client_id: None)
     payload = {
         "request": {
@@ -103,14 +103,16 @@ def test_analyze_unknown_client_returns_404(client, monkeypatch):
         },
         "clarification_state": None,
     }
-    resp = client.post("/analyze", json=payload, headers=HEADERS)
-    assert resp.status_code == 404
+    resp = client.post("/analyze", json=payload, headers={"X-Client-ID": "c1", "X-API-Key": "wrong"})
+    assert resp.status_code == 401
 
 
 def test_analyze_known_client_returns_200(client, monkeypatch):
+    client_key = "test-client-key-" * 4
     config = ClientConfig(
         client_id="c1", name="Test Co", tier=Tier.BASIC,
         enabled_skills=[], account_mode="vendor", active_channels=[Channel.SLACK],
+        api_key=client_key,
     )
     monkeypatch.setattr(main_module.registry, "get", lambda client_id: config)
     mock_resp = Response(request_id="r1", text="Analysis complete.")
@@ -122,7 +124,10 @@ def test_analyze_known_client_returns_200(client, monkeypatch):
         },
         "clarification_state": None,
     }
-    resp = client.post("/analyze", json=payload, headers=HEADERS)
+    resp = client.post(
+        "/analyze", json=payload,
+        headers={"X-Client-ID": "c1", "X-API-Key": client_key},
+    )
     assert resp.status_code == 200
     assert resp.json()["text"] == "Analysis complete."
 

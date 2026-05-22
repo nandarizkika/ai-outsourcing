@@ -29,7 +29,8 @@ from src.agents.report_agent import ReportAgent
 from fastapi import HTTPException
 from pydantic import BaseModel as PydanticBaseModel
 from typing import Optional as OptionalType
-from src.core.auth import make_verify_api_key
+import secrets
+from src.core.auth import make_verify_api_key, make_verify_client_api_key
 from src.core.logging_config import configure_logging
 from src.middleware.logging import RequestLoggingMiddleware
 
@@ -57,6 +58,7 @@ segmentation_agent = SegmentationAgent(llm=llm)
 ab_agent = ABTestingAgent(llm=llm)
 
 registry = ClientRegistry(settings.clients_file)
+verify_client_api_key = make_verify_client_api_key(registry)
 
 
 class RegistryAdapter(dict):
@@ -163,8 +165,10 @@ class AnalyzeBody(PydanticBaseModel):
 
 @app.post("/clients", status_code=201, dependencies=[Depends(verify_api_key)])
 def create_client(config: ClientConfig):
+    api_key = secrets.token_hex(32)
+    config = config.model_copy(update={"api_key": api_key})
     registry.upsert(config)
-    return config.model_dump()
+    return {"client_id": config.client_id, "api_key": api_key}
 
 
 @app.get("/clients", dependencies=[Depends(verify_api_key)])
@@ -185,7 +189,17 @@ def delete_client(client_id: str):
     registry.delete(client_id)
 
 
-@app.post("/analyze", dependencies=[Depends(verify_api_key)])
+@app.post("/clients/{client_id}/rotate-key", dependencies=[Depends(verify_api_key)])
+def rotate_client_key(client_id: str):
+    config = registry.get(client_id)
+    if config is None:
+        raise HTTPException(status_code=404, detail="Client not found")
+    new_key = secrets.token_hex(32)
+    registry.upsert(config.model_copy(update={"api_key": new_key}))
+    return {"api_key": new_key}
+
+
+@app.post("/analyze", dependencies=[Depends(verify_client_api_key)])
 def analyze(body: AnalyzeBody):
     config = registry.get(body.request.client_id)
     if config is None:
