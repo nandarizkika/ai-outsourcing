@@ -53,3 +53,13 @@ def test_settings_clients_file_default():
     os.environ.setdefault("SLACK_SIGNING_SECRET", "x")
     s = Settings()
     assert s.clients_file == "clients.json"
+
+
+def test_client_config_api_key_defaults_to_none():
+    config = ClientConfig(**_base_config())
+    assert config.api_key is None
+
+
+def test_client_config_accepts_api_key():
+    config = ClientConfig(**_base_config(api_key="abc123secret"))
+    assert config.api_key == "abc123secret"

@@ -64,6 +64,7 @@ class ClientConfig(BaseModel):
     database_url: Optional[str] = None
     connector_type: Optional[Literal["postgres", "mysql", "bigquery", "snowflake"]] = None
     connector_config: Optional[dict] = None
+    api_key: Optional[str] = None
 
 
 class ClarificationState(BaseModel):
