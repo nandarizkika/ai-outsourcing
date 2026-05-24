@@ -311,30 +311,37 @@ class Orchestrator:
             self._generate_response, request, context, sql_data, state.assumptions
         )
 
-        # Stage 4 — Output agents (sequential for now; parallelised in Task 3)
+        # Stage 4 — Output agents (parallel)
         report_markdown: str | None = None
         report_html: str | None = None
         deck_pptx: bytes | None = None
+
+        stage4_fns: list = []
+        stage4_labels: list[str] = []
 
         if (
             plan.get("report")
             and self._report_agent is not None
             and SkillModule.REPORT_GENERATION in config.enabled_skills
         ):
-            report_result = await asyncio.to_thread(
-                lambda: self._report_agent.run(
-                    config.client_id,
-                    request.text,
+            _report = self._report_agent
+            _cid_r = config.client_id
+            _txt_r = request.text
+            _sd_r = sql_data
+            _anom_r = anomalies
+            _text_r = text
+            stage4_fns.append(
+                lambda: _report.run(
+                    _cid_r,
+                    _txt_r,
                     {
-                        "analysis_text": text,
-                        "sql_rows": (sql_data.get("rows", []) or [])[:10] if sql_data else [],
-                        "anomalies": anomalies,
+                        "analysis_text": _text_r,
+                        "sql_rows": (_sd_r.get("rows", []) or [])[:10] if _sd_r else [],
+                        "anomalies": _anom_r,
                     },
                 )
             )
-            if report_result.success:
-                report_markdown = report_result.data["markdown"]
-                report_html = report_result.data["html"]
+            stage4_labels.append("report")
 
         if (
             plan.get("deck")
@@ -352,13 +359,29 @@ class Orchestrator:
                     recommendation="",
                 )
             )
-            deck_result = await asyncio.to_thread(
-                lambda: self._deck_agent.run(
-                    title=request.text[:100], storyline=storyline, charts=charts
-                )
+            _deck = self._deck_agent
+            _title = request.text[:100]
+            _story = storyline
+            _charts = charts
+            stage4_fns.append(
+                lambda: _deck.run(title=_title, storyline=_story, charts=_charts)
             )
-            if deck_result.success:
-                deck_pptx = deck_result.deck_pptx
+            stage4_labels.append("deck")
+
+        if stage4_fns:
+            stage4_results = await self._run_stage(stage4_fns)
+            for label, result in zip(stage4_labels, stage4_results):
+                if isinstance(result, Exception):
+                    _logger.warning("agent_failed agent=%s error=%s", label, result)
+                    continue
+                if not result.success:
+                    continue
+                if label == "report":
+                    report_markdown = result.data["markdown"]
+                    report_html = result.data["html"]
+                elif label == "deck":
+                    if isinstance(result.deck_pptx, bytes):
+                        deck_pptx = result.deck_pptx
 
         response = Response(
             request_id=str(uuid.uuid4()),

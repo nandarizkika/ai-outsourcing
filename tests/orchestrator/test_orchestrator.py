@@ -356,3 +356,55 @@ async def test_stage3_exception_does_not_abort_other_agents():
         ),
     )
     assert result.charts, "chart result should be present despite anomaly failure"
+
+
+import time as _time
+
+
+async def test_stage4_output_agents_run_in_parallel():
+    """Report and deck agents run concurrently — total time < sequential sum."""
+    deps = _make_orc_deps()
+    # plan returns report=True, deck=True
+    deps["llm"].complete.side_effect = [
+        '{"sql": true, "chart": false, "ml": false, "deck": true, '
+        '"funnel": false, "cohort": false, "hypothesis": false, '
+        '"segment": false, "ab_test": false, "report": true}',
+        "Analysis complete.",
+    ]
+
+    def _slow_report(*args, **kwargs):
+        _time.sleep(0.05)
+        return AgentResult(
+            agent_name="report_agent", success=True,
+            data={"markdown": "# R", "html": "<h1>R</h1>"},
+        )
+
+    def _slow_deck(*args, **kwargs):
+        _time.sleep(0.05)
+        return AgentResult(agent_name="deck_agent", success=True, deck_pptx=b"pptx")
+
+    mock_report = MagicMock()
+    mock_report.run.side_effect = _slow_report
+
+    mock_deck = MagicMock()
+    mock_deck.run.side_effect = _slow_deck
+    mock_deck.build_storyline.return_value = MagicMock()
+
+    orc = Orchestrator(
+        **deps,
+        report_agent=mock_report,
+        deck_agent=mock_deck,
+    )
+    config = _make_config(
+        SkillModule.SQL_QUERYING,
+        SkillModule.REPORT_GENERATION,
+        SkillModule.PRESENTATION_BUILDING,
+    )
+
+    start = _time.monotonic()
+    result = await orc.process(_make_request(text="generate a report and a deck"), config)
+    elapsed = _time.monotonic() - start
+
+    assert elapsed < 0.09, f"Expected parallel (~50ms), got {elapsed:.3f}s (sequential would be ~100ms)"
+    assert result.report_markdown is not None
+    assert result.deck_pptx is not None
