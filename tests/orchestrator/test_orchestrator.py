@@ -326,3 +326,33 @@ async def test_process_is_awaitable():
     orc = Orchestrator(**deps)
     result = await orc.process(_make_request(), _make_config(SkillModule.SQL_QUERYING))
     assert isinstance(result, Response)
+
+
+async def test_stage3_exception_does_not_abort_other_agents():
+    """If one Stage 3 agent raises, others still run and their results appear."""
+    deps = _make_orc_deps()
+
+    # anomaly raises
+    mock_anomaly = MagicMock()
+    mock_anomaly.run.side_effect = RuntimeError("anomaly crashed")
+
+    # chart returns a png
+    mock_chart = MagicMock()
+    mock_chart.run.return_value = AgentResult(
+        agent_name="chart_agent", success=True, chart_png=b"fakepng"
+    )
+
+    orc = Orchestrator(
+        **{k: v for k, v in deps.items() if k not in ("chart_agent",)},
+        chart_agent=mock_chart,
+        anomaly_agent=mock_anomaly,
+    )
+    result = await orc.process(
+        _make_request(),
+        _make_config(
+            SkillModule.SQL_QUERYING,
+            SkillModule.DATA_VISUALIZATION,
+            SkillModule.HARD_RULE_ANOMALY,
+        ),
+    )
+    assert result.charts, "chart result should be present despite anomaly failure"

@@ -203,22 +203,24 @@ class Orchestrator:
                     if sql_data and sql_data.get("query"):
                         sql_queries.append(sql_data["query"])
 
-        # Stage 3 — Analysis agents (sequential for now; parallelised in Task 2)
-        _sql_data = sql_data
+        # Stage 3 — Analysis agents (parallel)
         if sql_data:
+            stage3_fns: list = []
+            stage3_labels: list[str] = []
+            _sql_data = sql_data
+
+            if self._chart_agent is not None and SkillModule.DATA_VISUALIZATION in config.enabled_skills:
+                _chart = self._chart_agent
+                _sd = _sql_data
+                stage3_fns.append(lambda: _chart.run(_sd))
+                stage3_labels.append("chart")
+
             anomaly_skill = (
                 SkillModule.HARD_RULE_ANOMALY in config.enabled_skills
                 or SkillModule.STATISTICAL_ANOMALY in config.enabled_skills
             )
-            if self._chart_agent is not None and SkillModule.DATA_VISUALIZATION in config.enabled_skills:
-                chart_result = await asyncio.to_thread(
-                    lambda: self._chart_agent.run(_sql_data)
-                )
-                if chart_result.success and chart_result.chart_png:
-                    charts.append(chart_result.chart_png)
-
             if self._anomaly_agent is not None and anomaly_skill:
-                mode = (
+                _amode = (
                     "both"
                     if SkillModule.HARD_RULE_ANOMALY in config.enabled_skills
                     and SkillModule.STATISTICAL_ANOMALY in config.enabled_skills
@@ -226,58 +228,83 @@ class Orchestrator:
                     if SkillModule.HARD_RULE_ANOMALY in config.enabled_skills
                     else "statistical"
                 )
-                _amode = mode
-                anomaly_result = await asyncio.to_thread(
-                    lambda: self._anomaly_agent.run(config.client_id, _sql_data, mode=_amode)
-                )
-                if anomaly_result.success:
-                    anomalies = anomaly_result.data.get("anomalies", [])
+                _anomaly = self._anomaly_agent
+                _cid = config.client_id
+                _sd2 = _sql_data
+                stage3_fns.append(lambda: _anomaly.run(_cid, _sd2, mode=_amode))
+                stage3_labels.append("anomaly")
 
             if (
                 plan.get("ml")
                 and self._ml_agent is not None
                 and SkillModule.MACHINE_LEARNING in config.enabled_skills
             ):
-                ml_result = await asyncio.to_thread(
-                    lambda: self._ml_agent.run(config.client_id, request.text, _sql_data)
-                )
-                if ml_result.success and ml_result.chart_png:
-                    charts.append(ml_result.chart_png)
+                _ml = self._ml_agent
+                _cid2 = config.client_id
+                _txt = request.text
+                _sd3 = _sql_data
+                stage3_fns.append(lambda: _ml.run(_cid2, _txt, _sd3))
+                stage3_labels.append("ml")
 
             if (
                 plan.get("hypothesis")
                 and self._hypothesis_agent is not None
                 and SkillModule.HYPOTHESIS_TESTING in config.enabled_skills
             ):
-                hyp_result = await asyncio.to_thread(
-                    lambda: self._hypothesis_agent.run(config.client_id, request.text, _sql_data)
-                )
-                if hyp_result.success:
-                    sql_data = {**(sql_data or {}), **hyp_result.data}
+                _hyp = self._hypothesis_agent
+                _cid3 = config.client_id
+                _txt2 = request.text
+                _sd4 = _sql_data
+                stage3_fns.append(lambda: _hyp.run(_cid3, _txt2, _sd4))
+                stage3_labels.append("hypothesis")
 
             if (
                 plan.get("segment")
                 and self._segmentation_agent is not None
                 and SkillModule.SEGMENTATION in config.enabled_skills
             ):
-                seg_result = await asyncio.to_thread(
-                    lambda: self._segmentation_agent.run(config.client_id, request.text, _sql_data)
-                )
-                if seg_result.success:
-                    if seg_result.chart_png:
-                        charts.append(seg_result.chart_png)
-                    sql_data = {**(sql_data or {}), **seg_result.data}
+                _seg = self._segmentation_agent
+                _cid4 = config.client_id
+                _txt3 = request.text
+                _sd5 = _sql_data
+                stage3_fns.append(lambda: _seg.run(_cid4, _txt3, _sd5))
+                stage3_labels.append("segment")
 
             if (
                 plan.get("ab_test")
                 and self._ab_agent is not None
                 and SkillModule.AB_TESTING in config.enabled_skills
             ):
-                ab_result = await asyncio.to_thread(
-                    lambda: self._ab_agent.run(config.client_id, request.text, _sql_data)
-                )
-                if ab_result.success:
-                    sql_data = {**(sql_data or {}), **ab_result.data}
+                _ab = self._ab_agent
+                _cid5 = config.client_id
+                _txt4 = request.text
+                _sd6 = _sql_data
+                stage3_fns.append(lambda: _ab.run(_cid5, _txt4, _sd6))
+                stage3_labels.append("ab_test")
+
+            stage3_results = await self._run_stage(stage3_fns)
+
+            enriched: dict = dict(sql_data)
+            for label, result in zip(stage3_labels, stage3_results):
+                if isinstance(result, Exception):
+                    _logger.warning("agent_failed agent=%s error=%s", label, result)
+                    continue
+                if not result.success:
+                    continue
+                if label == "chart":
+                    if isinstance(result.chart_png, bytes):
+                        charts.append(result.chart_png)
+                elif label == "anomaly":
+                    anomalies = result.data.get("anomalies", [])
+                elif label == "ml":
+                    if isinstance(result.chart_png, bytes):
+                        charts.append(result.chart_png)
+                elif label in ("hypothesis", "segment", "ab_test"):
+                    enriched.update(result.data)
+                    if isinstance(result.chart_png, bytes):
+                        charts.append(result.chart_png)
+
+            sql_data = enriched
 
         # Stage 3b — Generate response (sequential LLM call)
         text = await asyncio.to_thread(
