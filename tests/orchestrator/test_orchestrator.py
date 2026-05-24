@@ -1,4 +1,5 @@
 import pytest
+import time as _time
 from datetime import datetime
 from unittest.mock import MagicMock
 from src.orchestrator.orchestrator import Orchestrator
@@ -356,9 +357,6 @@ async def test_stage3_exception_does_not_abort_other_agents():
         ),
     )
     assert result.charts, "chart result should be present despite anomaly failure"
-
-
-import time as _time
 
 
 async def test_stage4_output_agents_run_in_parallel():
