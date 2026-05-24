@@ -1,6 +1,6 @@
 """Phase 3 end-to-end integration tests."""
 from io import BytesIO
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from pptx import Presentation
@@ -119,11 +119,11 @@ def test_deck_agent_path_produces_valid_pptx():
 def test_scheduled_job_fires_and_calls_callback():
     """JobScheduler._run_job fires orchestrator and calls the delivery callback."""
     mock_orchestrator = MagicMock()
-    mock_orchestrator.process.return_value = Response(
+    mock_orchestrator.process = AsyncMock(return_value=Response(
         request_id="r1",
         text="Weekly revenue: 500M IDR",
         charts=[],
-    )
+    ))
     config = _make_client_config([SkillModule.REPORT_GENERATION])
     scheduler = JobScheduler(
         orchestrator=mock_orchestrator,

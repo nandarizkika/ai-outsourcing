@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Callable
@@ -53,7 +54,7 @@ class JobScheduler:
             client_id=job.client_id,
         )
         try:
-            result = self._orchestrator.process(request, config)
+            result = asyncio.run(self._orchestrator.process(request, config))
             job.last_run = datetime.now(timezone.utc).isoformat()
             if hasattr(result, "text"):
                 job.last_result_summary = result.text[:500]

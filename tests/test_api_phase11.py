@@ -1,6 +1,6 @@
 # tests/test_api_phase11.py
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 from fastapi.testclient import TestClient
 
 import main as main_module
@@ -87,7 +87,7 @@ def test_analyze_accepts_correct_client_key(client, monkeypatch):
     )
     monkeypatch.setattr(main_module.registry, "get", lambda client_id: config)
     mock_resp = Response(request_id="r1", text="Analysis complete.")
-    monkeypatch.setattr(main_module.orchestrator, "process", MagicMock(return_value=mock_resp))
+    monkeypatch.setattr(main_module.orchestrator, "process", AsyncMock(return_value=mock_resp))
     payload = {
         "request": {
             "channel": "slack", "sender_id": "u1", "sender_name": "User",
@@ -142,7 +142,7 @@ def test_analyze_rate_limit_returns_429(client, monkeypatch):
     )
     monkeypatch.setattr(main_module.registry, "get", lambda client_id: config)
     mock_resp = Response(request_id="r1", text="ok")
-    monkeypatch.setattr(main_module.orchestrator, "process", MagicMock(return_value=mock_resp))
+    monkeypatch.setattr(main_module.orchestrator, "process", AsyncMock(return_value=mock_resp))
 
     # Temporarily swap the route limit to 1/minute, then restore after test
     route_key = "main.analyze"

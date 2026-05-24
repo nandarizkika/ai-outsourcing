@@ -1,6 +1,6 @@
 # tests/test_api.py
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 from fastapi.testclient import TestClient
 
 import main as main_module
@@ -116,7 +116,7 @@ def test_analyze_known_client_returns_200(client, monkeypatch):
     )
     monkeypatch.setattr(main_module.registry, "get", lambda client_id: config)
     mock_resp = Response(request_id="r1", text="Analysis complete.")
-    monkeypatch.setattr(main_module.orchestrator, "process", MagicMock(return_value=mock_resp))
+    monkeypatch.setattr(main_module.orchestrator, "process", AsyncMock(return_value=mock_resp))
     payload = {
         "request": {
             "channel": "slack", "sender_id": "u1", "sender_name": "User",

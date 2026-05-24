@@ -209,13 +209,13 @@ def rotate_client_key(client_id: str):
 
 @app.post("/analyze", dependencies=[Depends(verify_client_api_key)])
 @limiter.limit("60/minute")
-def analyze(request: StarletteRequest, body: AnalyzeBody, x_client_id: str = Header(default="")):
+async def analyze(request: StarletteRequest, body: AnalyzeBody, x_client_id: str = Header(default="")):
     if body.request.client_id != x_client_id:
         raise HTTPException(status_code=403, detail="client_id mismatch")
     config = registry.get(body.request.client_id)
     if config is None:
         raise HTTPException(status_code=404, detail="Client not found")
-    result = orchestrator.process(body.request, config, body.clarification_state)
+    result = await orchestrator.process(body.request, config, body.clarification_state)
     if hasattr(result, "model_dump"):
         return result.model_dump()
     return {"result": str(result)}

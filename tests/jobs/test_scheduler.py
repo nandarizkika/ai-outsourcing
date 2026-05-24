@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from src.jobs.scheduler import JobScheduler
@@ -7,9 +7,9 @@ from src.core.models import ScheduledJob, Channel, Response, ClientConfig, Tier
 
 def _make_scheduler():
     mock_orchestrator = MagicMock()
-    mock_orchestrator.process.return_value = Response(
+    mock_orchestrator.process = AsyncMock(return_value=Response(
         request_id="r1", text="Revenue grew 10%", charts=[]
-    )
+    ))
     client_configs = {
         "client1": ClientConfig(
             client_id="client1",
