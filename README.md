@@ -190,6 +190,30 @@ curl -X POST http://localhost:8000/clients/acme/rotate-key \
   -H "X-API-Key: <your-admin-key>"
 ```
 
+## Deployment
+
+**Docker (recommended)**
+
+```bash
+docker compose up -d
+```
+
+The app runs on port 8000. Mount `clients.json` and `.chromadb` as volumes so data survives restarts (see `docker-compose.yml`).
+
+**HTTPS with Caddy**
+
+[Caddy](https://caddyserver.com) handles TLS certificates automatically via Let's Encrypt. Install it, edit `Caddyfile` to replace `your-domain.com` with your actual domain, then:
+
+```bash
+caddy run
+```
+
+Caddy proxies HTTPS → `localhost:8000`. Your app needs no TLS config changes.
+
+**Rate limiting**
+
+`/analyze` is limited to **60 requests per minute per client** (keyed on `X-Client-ID`). Clients that exceed this receive a `429 Too Many Requests` response.
+
 ## Running tests
 
 ```bash

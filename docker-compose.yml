@@ -1,0 +1,10 @@
+services:
+  app:
+    build: .
+    env_file: .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./clients.json:/app/clients.json
+      - ./.chromadb:/app/.chromadb
+    restart: unless-stopped

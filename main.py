@@ -31,6 +31,9 @@ from pydantic import BaseModel as PydanticBaseModel
 from typing import Optional as OptionalType
 import secrets
 from src.core.auth import make_verify_api_key, make_verify_client_api_key
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from starlette.requests import Request as StarletteRequest
 from src.core.logging_config import configure_logging
 from src.middleware.logging import RequestLoggingMiddleware
 
@@ -59,6 +62,11 @@ ab_agent = ABTestingAgent(llm=llm)
 
 registry = ClientRegistry(settings.clients_file)
 verify_client_api_key = make_verify_client_api_key(registry)
+
+def _get_client_id(request: StarletteRequest) -> str:
+    return request.headers.get("X-Client-ID") or request.client.host
+
+limiter = Limiter(key_func=_get_client_id)
 
 
 class RegistryAdapter(dict):
@@ -116,12 +124,10 @@ if settings.jira_url:
     ticketing_service = TicketingService(jira_client=jira_client)
 
 # Slack bot user ID — fetch from Slack API at startup
-SLACK_BOT_USER_ID = "REPLACE_WITH_BOT_USER_ID"
-
 slack = SlackChannel(
     bot_token=settings.slack_bot_token,
     signing_secret=settings.slack_signing_secret,
-    bot_user_id=SLACK_BOT_USER_ID,
+    bot_user_id=settings.slack_bot_user_id,
     orchestrator=orchestrator,
     client_configs=client_configs,
     ticketing_service=ticketing_service,
@@ -152,6 +158,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(RequestLoggingMiddleware)
 
 
@@ -200,7 +208,8 @@ def rotate_client_key(client_id: str):
 
 
 @app.post("/analyze", dependencies=[Depends(verify_client_api_key)])
-def analyze(body: AnalyzeBody, x_client_id: str = Header(default="")):
+@limiter.limit("60/minute")
+def analyze(request: StarletteRequest, body: AnalyzeBody, x_client_id: str = Header(default="")):
     if body.request.client_id != x_client_id:
         raise HTTPException(status_code=403, detail="client_id mismatch")
     config = registry.get(body.request.client_id)

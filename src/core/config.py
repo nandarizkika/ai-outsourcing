@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     clients_file: str = "clients.json"
     api_key: str = ""
     log_level: str = "INFO"
+    slack_bot_user_id: str = ""
 
     # Jira settings
     jira_url: str = ""
