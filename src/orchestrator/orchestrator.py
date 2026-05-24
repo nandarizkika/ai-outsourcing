@@ -73,6 +73,7 @@ class Orchestrator:
         raw = self._llm.complete(TaskType.SIMPLE, system, f"Request: {request.text}")
         return raw.strip().lower().startswith("true")
 
+    # Used in Task 2 (Stage 3) and Task 3 (Stage 4) to run callables concurrently.
     async def _run_stage(self, callables: list) -> list:
         return await asyncio.gather(
             *[asyncio.to_thread(fn) for fn in callables],
@@ -85,7 +86,9 @@ class Orchestrator:
         config: ClientConfig,
         clarification_state: ClarificationState | None = None,
     ) -> "Response | ClarificationState | AnalystResult":
-        context = self._retriever.search(config.client_id, request.text)
+        context = await asyncio.to_thread(
+            self._retriever.search, config.client_id, request.text
+        )
 
         if (
             self._analyst_agent is not None
@@ -122,7 +125,7 @@ class Orchestrator:
             self._analyst_agent is not None
             and SkillModule.DEEP_ANALYSIS in config.enabled_skills
             and clarification_state is None
-            and self._detect_deep_intent(request)
+            and await asyncio.to_thread(self._detect_deep_intent, request)
         ):
             deep_state = ClarificationState(original_request=request)
             deep_state.questions_asked = [
@@ -160,8 +163,8 @@ class Orchestrator:
 
         # Funnel KB lookup (sequential — may return early with clarification)
         if plan.get("funnel") and SkillModule.FUNNEL_ANALYSIS in config.enabled_skills:
-            funnel_docs = self._retriever.search(
-                config.client_id, "funnel stages conversion steps flow"
+            funnel_docs = await asyncio.to_thread(
+                self._retriever.search, config.client_id, "funnel stages conversion steps flow"
             )
             if funnel_docs:
                 context = context + funnel_docs[:2]
@@ -201,6 +204,7 @@ class Orchestrator:
                         sql_queries.append(sql_data["query"])
 
         # Stage 3 — Analysis agents (sequential for now; parallelised in Task 2)
+        _sql_data = sql_data
         if sql_data:
             anomaly_skill = (
                 SkillModule.HARD_RULE_ANOMALY in config.enabled_skills
@@ -208,7 +212,7 @@ class Orchestrator:
             )
             if self._chart_agent is not None and SkillModule.DATA_VISUALIZATION in config.enabled_skills:
                 chart_result = await asyncio.to_thread(
-                    lambda: self._chart_agent.run(sql_data)
+                    lambda: self._chart_agent.run(_sql_data)
                 )
                 if chart_result.success and chart_result.chart_png:
                     charts.append(chart_result.chart_png)
@@ -224,7 +228,7 @@ class Orchestrator:
                 )
                 _amode = mode
                 anomaly_result = await asyncio.to_thread(
-                    lambda: self._anomaly_agent.run(config.client_id, sql_data, mode=_amode)
+                    lambda: self._anomaly_agent.run(config.client_id, _sql_data, mode=_amode)
                 )
                 if anomaly_result.success:
                     anomalies = anomaly_result.data.get("anomalies", [])
@@ -235,7 +239,7 @@ class Orchestrator:
                 and SkillModule.MACHINE_LEARNING in config.enabled_skills
             ):
                 ml_result = await asyncio.to_thread(
-                    lambda: self._ml_agent.run(config.client_id, request.text, sql_data)
+                    lambda: self._ml_agent.run(config.client_id, request.text, _sql_data)
                 )
                 if ml_result.success and ml_result.chart_png:
                     charts.append(ml_result.chart_png)
@@ -246,7 +250,7 @@ class Orchestrator:
                 and SkillModule.HYPOTHESIS_TESTING in config.enabled_skills
             ):
                 hyp_result = await asyncio.to_thread(
-                    lambda: self._hypothesis_agent.run(config.client_id, request.text, sql_data)
+                    lambda: self._hypothesis_agent.run(config.client_id, request.text, _sql_data)
                 )
                 if hyp_result.success:
                     sql_data = {**(sql_data or {}), **hyp_result.data}
@@ -257,7 +261,7 @@ class Orchestrator:
                 and SkillModule.SEGMENTATION in config.enabled_skills
             ):
                 seg_result = await asyncio.to_thread(
-                    lambda: self._segmentation_agent.run(config.client_id, request.text, sql_data)
+                    lambda: self._segmentation_agent.run(config.client_id, request.text, _sql_data)
                 )
                 if seg_result.success:
                     if seg_result.chart_png:
@@ -270,7 +274,7 @@ class Orchestrator:
                 and SkillModule.AB_TESTING in config.enabled_skills
             ):
                 ab_result = await asyncio.to_thread(
-                    lambda: self._ab_agent.run(config.client_id, request.text, sql_data)
+                    lambda: self._ab_agent.run(config.client_id, request.text, _sql_data)
                 )
                 if ab_result.success:
                     sql_data = {**(sql_data or {}), **ab_result.data}
@@ -341,10 +345,12 @@ class Orchestrator:
         )
 
         if self._memory_logger is not None:
-            self._memory_logger.log(
-                request=request,
-                response=response,
-                sql_queries=sql_queries,
+            await asyncio.to_thread(
+                lambda: self._memory_logger.log(
+                    request=request,
+                    response=response,
+                    sql_queries=sql_queries,
+                )
             )
 
         return response
