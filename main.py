@@ -141,7 +141,7 @@ if settings.email_imap_host:
         ticketing_service=ticketing_service,
     )
 
-configure_logging()
+configure_logging(level=settings.log_level)
 
 
 @asynccontextmanager
@@ -173,7 +173,7 @@ def create_client(config: ClientConfig):
 
 @app.get("/clients", dependencies=[Depends(verify_api_key)])
 def list_clients():
-    return {"clients": [c.model_dump() for c in registry.all()]}
+    return {"clients": [c.model_dump(exclude={"api_key"}) for c in registry.all()]}
 
 
 @app.get("/clients/{client_id}", dependencies=[Depends(verify_api_key)])
@@ -181,7 +181,7 @@ def get_client(client_id: str):
     config = registry.get(client_id)
     if config is None:
         raise HTTPException(status_code=404, detail="Client not found")
-    return config.model_dump()
+    return config.model_dump(exclude={"api_key"})
 
 
 @app.delete("/clients/{client_id}", status_code=204, dependencies=[Depends(verify_api_key)])
@@ -219,7 +219,8 @@ async def slack_events(req: Request):
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    from datetime import datetime, timezone
+    return {"status": "ok", "version": "0.1.0", "timestamp": datetime.now(timezone.utc).isoformat()}
 
 
 def make_deliver():

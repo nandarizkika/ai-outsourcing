@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     chromadb_persist_dir: str = ".chromadb"
     clients_file: str = "clients.json"
     api_key: str = ""
+    log_level: str = "INFO"
 
     # Jira settings
     jira_url: str = ""
