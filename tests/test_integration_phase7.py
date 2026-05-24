@@ -53,7 +53,7 @@ def _make_orchestrator(llm, **agents):
     )
 
 
-def test_orchestrator_routes_to_report_agent_when_plan_set():
+async def test_orchestrator_routes_to_report_agent_when_plan_set():
     plan_json = '{"sql": false, "chart": false, "ml": false, "deck": false, "funnel": false, "cohort": false, "hypothesis": false, "segment": false, "ab_test": false, "report": true}'
     llm = _make_llm(plan_json=plan_json)
     mock_report = MagicMock(spec=ReportAgent)
@@ -63,13 +63,13 @@ def test_orchestrator_routes_to_report_agent_when_plan_set():
     )
     orch = _make_orchestrator(llm, report_agent=mock_report)
     config = _make_config([SkillModule.REPORT_GENERATION])
-    result = orch.process(_make_request("Generate a weekly report"), config)
+    result = await orch.process(_make_request("Generate a weekly report"), config)
     mock_report.run.assert_called_once()
     assert result.report_markdown == "## Summary\n- Good"
     assert result.report_html == "<h2>Summary</h2><ul><li>Good</li></ul>"
 
 
-def test_registry_upsert_and_retrieve(tmp_path):
+async def test_registry_upsert_and_retrieve(tmp_path):
     from src.core.client_registry import ClientRegistry
     reg = ClientRegistry(str(tmp_path / "c.json"))
     config = _make_config([SkillModule.SQL_QUERYING])
@@ -79,7 +79,7 @@ def test_registry_upsert_and_retrieve(tmp_path):
     assert result.client_id == "c1"
 
 
-def test_orchestrator_uses_registry_connector_over_sql_agent():
+async def test_orchestrator_uses_registry_connector_over_sql_agent():
     from sqlalchemy import create_engine, text as sa_text
     from src.connectors.sql import SQLConnector
 
@@ -111,13 +111,13 @@ def test_orchestrator_uses_registry_connector_over_sql_agent():
 
     orch = _make_orchestrator(mock_llm, registry=mock_registry)
     config = _make_config([SkillModule.SQL_QUERYING])
-    result = orch.process(_make_request("Show me metrics"), config)
+    result = await orch.process(_make_request("Show me metrics"), config)
 
     mock_registry.get_connector.assert_called_once_with("c1")
     assert hasattr(result, "text")
 
 
-def test_deliver_routes_to_slack_channel():
+async def test_deliver_routes_to_slack_channel():
     from src.jobs.delivery import deliver
     from src.core.models import ScheduledJob, Channel, Response
 
@@ -138,7 +138,7 @@ def test_deliver_routes_to_slack_channel():
     mock_slack.send_message.assert_called_once_with("C123456", "## Summary\n- Revenue up")
 
 
-def test_deliver_routes_to_email_channel():
+async def test_deliver_routes_to_email_channel():
     from src.jobs.delivery import deliver
     from src.core.models import ScheduledJob, Channel, Response
 
@@ -163,7 +163,7 @@ def test_deliver_routes_to_email_channel():
     )
 
 
-def test_deliver_falls_back_to_text_when_no_report():
+async def test_deliver_falls_back_to_text_when_no_report():
     from src.jobs.delivery import deliver
     from src.core.models import ScheduledJob, Channel, Response
 

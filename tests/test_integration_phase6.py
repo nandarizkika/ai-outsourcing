@@ -66,12 +66,12 @@ def _make_orchestrator(llm, **agents):
     )
 
 
-def test_orchestrator_deck_uses_storyline_path():
+async def test_orchestrator_deck_uses_storyline_path():
     llm = _make_llm()
     deck_agent = DeckAgent(llm=llm)
     orch = _make_orchestrator(llm, deck_agent=deck_agent)
     config = _make_config([SkillModule.PRESENTATION_BUILDING])
-    result = orch.process(_make_request("Build me a presentation of the analysis"), config)
+    result = await orch.process(_make_request("Build me a presentation of the analysis"), config)
     assert hasattr(result, "deck_pptx")
     assert result.deck_pptx is not None
     prs = Presentation(io.BytesIO(result.deck_pptx))
@@ -79,7 +79,7 @@ def test_orchestrator_deck_uses_storyline_path():
     assert len(prs.slides) >= 4
 
 
-def test_orchestrator_routes_to_hypothesis_agent_when_plan_set():
+async def test_orchestrator_routes_to_hypothesis_agent_when_plan_set():
     from src.agents.hypothesis_agent import HypothesisAgent
     import numpy as np
 
@@ -102,11 +102,11 @@ def test_orchestrator_routes_to_hypothesis_agent_when_plan_set():
     orch._sql_agent = mock_sql
 
     config = _make_config([SkillModule.SQL_QUERYING, SkillModule.HYPOTHESIS_TESTING])
-    result = orch.process(_make_request("Is there a significant difference between groups A and B?"), config)
+    result = await orch.process(_make_request("Is there a significant difference between groups A and B?"), config)
     mock_hyp.run.assert_called_once()
 
 
-def test_orchestrator_routes_to_segmentation_agent_when_plan_set():
+async def test_orchestrator_routes_to_segmentation_agent_when_plan_set():
     from src.agents.segmentation_agent import SegmentationAgent
     import numpy as np
 
@@ -127,11 +127,11 @@ def test_orchestrator_routes_to_segmentation_agent_when_plan_set():
     orch._sql_agent = mock_sql
 
     config = _make_config([SkillModule.SQL_QUERYING, SkillModule.SEGMENTATION])
-    result = orch.process(_make_request("Segment our customers by revenue and sessions"), config)
+    result = await orch.process(_make_request("Segment our customers by revenue and sessions"), config)
     mock_seg.run.assert_called_once()
 
 
-def test_orchestrator_routes_to_ab_agent_when_plan_set():
+async def test_orchestrator_routes_to_ab_agent_when_plan_set():
     from src.agents.ab_agent import ABTestingAgent
 
     plan_json = '{"sql": true, "chart": false, "ml": false, "deck": false, "funnel": false, "cohort": false, "hypothesis": false, "segment": false, "ab_test": true}'
@@ -154,5 +154,5 @@ def test_orchestrator_routes_to_ab_agent_when_plan_set():
     orch._sql_agent = mock_sql
 
     config = _make_config([SkillModule.SQL_QUERYING, SkillModule.AB_TESTING])
-    result = orch.process(_make_request("Evaluate our A/B test results"), config)
+    result = await orch.process(_make_request("Evaluate our A/B test results"), config)
     mock_ab.run.assert_called_once()

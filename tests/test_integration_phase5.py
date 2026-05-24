@@ -53,7 +53,7 @@ def _base_orc_deps(llm_responses):
     )
 
 
-def test_orchestrator_detects_deep_intent_and_returns_clarification():
+async def test_orchestrator_detects_deep_intent_and_returns_clarification():
     deps = _base_orc_deps([
         "true",   # _detect_deep_intent returns "true"
         '{"sql": true, "chart": false, "ml": false, "deck": false, "funnel": false, "cohort": false}',
@@ -62,12 +62,12 @@ def test_orchestrator_detects_deep_intent_and_returns_clarification():
     mock_analyst = MagicMock(spec=AnalystAgent)
     orc = Orchestrator(**deps, analyst_agent=mock_analyst)
     config = _make_config(SkillModule.SQL_QUERYING, SkillModule.DEEP_ANALYSIS)
-    result = orc.process(_make_request("Why did churn spike?"), config)
+    result = await orc.process(_make_request("Why did churn spike?"), config)
     assert isinstance(result, ClarificationState)
     assert any("deep" in q.lower() or "dive" in q.lower() for q in result.questions_asked)
 
 
-def test_orchestrator_routes_to_spreadsheet_agent_when_file_present():
+async def test_orchestrator_routes_to_spreadsheet_agent_when_file_present():
     df = pd.DataFrame({"revenue": [100, 200, 300]})
     buf = io.BytesIO()
     df.to_csv(buf, index=False)
@@ -86,12 +86,12 @@ def test_orchestrator_routes_to_spreadsheet_agent_when_file_present():
     orc = Orchestrator(**deps, spreadsheet_agent=mock_spreadsheet)
     config = _make_config(SkillModule.SPREADSHEET_ANALYSIS, SkillModule.REPORT_GENERATION)
     request = _make_request(file_bytes=csv_bytes, filename="data.csv")
-    result = orc.process(request, config)
+    result = await orc.process(request, config)
     mock_spreadsheet.run.assert_called_once()
     assert isinstance(result, Response)
 
 
-def test_analyst_agent_full_loop_produces_analyst_result():
+async def test_analyst_agent_full_loop_produces_analyst_result():
     analyst_result = AnalystResult(
         agent_name="analyst_agent", success=True,
         steps=[StepRecord(step=1, thought="Checking churn", tool="sql_query",
@@ -113,12 +113,12 @@ def test_analyst_agent_full_loop_produces_analyst_result():
     config = _make_config(SkillModule.SQL_QUERYING, SkillModule.DEEP_ANALYSIS)
 
     req = _make_request("Why did churn spike?")
-    state = orc.process(req, config)
+    state = await orc.process(req, config)
     assert isinstance(state, ClarificationState)
 
     # User confirms deep dive
     state.deep_dive_confirmed = True
     state.is_resolved = True
 
-    result2 = orc.process(req, config, clarification_state=state)
+    result2 = await orc.process(req, config, clarification_state=state)
     assert mock_analyst.run_deep.called or isinstance(result2, (Response, AnalystResult))

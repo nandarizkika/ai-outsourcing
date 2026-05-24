@@ -53,7 +53,7 @@ def _make_config(*skills):
     )
 
 
-def test_orchestrator_runs_anomaly_agent_when_skill_enabled():
+async def test_orchestrator_runs_anomaly_agent_when_skill_enabled():
     deps = _make_orc_deps()
     mock_anomaly = MagicMock()
     mock_anomaly.run.return_value = AgentResult(
@@ -63,31 +63,31 @@ def test_orchestrator_runs_anomaly_agent_when_skill_enabled():
                               "expected": None, "operator": ">", "threshold": 0.1}]},
     )
     orc = Orchestrator(**deps, anomaly_agent=mock_anomaly)
-    result = orc.process(_make_request(), _make_config(SkillModule.SQL_QUERYING, SkillModule.HARD_RULE_ANOMALY))
+    result = await orc.process(_make_request(), _make_config(SkillModule.SQL_QUERYING, SkillModule.HARD_RULE_ANOMALY))
     mock_anomaly.run.assert_called_once()
     assert isinstance(result, Response)
     assert len(result.anomalies) == 1
 
 
-def test_orchestrator_skips_anomaly_when_skill_not_enabled():
+async def test_orchestrator_skips_anomaly_when_skill_not_enabled():
     deps = _make_orc_deps()
     mock_anomaly = MagicMock()
     orc = Orchestrator(**deps, anomaly_agent=mock_anomaly)
-    orc.process(_make_request(), _make_config(SkillModule.SQL_QUERYING))
+    await orc.process(_make_request(), _make_config(SkillModule.SQL_QUERYING))
     mock_anomaly.run.assert_not_called()
 
 
-def test_orchestrator_calls_memory_logger():
+async def test_orchestrator_calls_memory_logger():
     deps = _make_orc_deps()
     mock_logger = MagicMock()
     orc = Orchestrator(**deps, memory_logger=mock_logger)
-    result = orc.process(_make_request(text="show revenue"), _make_config(SkillModule.SQL_QUERYING))
+    result = await orc.process(_make_request(text="show revenue"), _make_config(SkillModule.SQL_QUERYING))
     mock_logger.log.assert_called_once()
     call_kwargs = mock_logger.log.call_args[1]
     assert call_kwargs["request"].text == "show revenue"
 
 
-def test_orchestrator_funnel_mode_passes_analysis_mode_to_sql():
+async def test_orchestrator_funnel_mode_passes_analysis_mode_to_sql():
     deps = _make_orc_deps()
     deps["llm"].complete.side_effect = [
         '{"sql": true, "chart": false, "ml": false, "deck": false, "funnel": true, "cohort": false}',
@@ -96,12 +96,12 @@ def test_orchestrator_funnel_mode_passes_analysis_mode_to_sql():
     # retriever returns funnel docs so we don't get a clarification
     deps["retriever"].search.return_value = ["Visit -> Signup -> Active -> Paid"]
     orc = Orchestrator(**deps)
-    orc.process(_make_request(text="show funnel"), _make_config(SkillModule.SQL_QUERYING, SkillModule.FUNNEL_ANALYSIS))
+    await orc.process(_make_request(text="show funnel"), _make_config(SkillModule.SQL_QUERYING, SkillModule.FUNNEL_ANALYSIS))
     call_args = deps["sql_agent"].run.call_args
     assert call_args[1].get("analysis_mode") == "funnel"
 
 
-def test_funnel_returns_clarification_when_no_kb_definition():
+async def test_funnel_returns_clarification_when_no_kb_definition():
     deps = _make_orc_deps()
     def search_side_effect(client_id, query):
         if "funnel" in query.lower():
@@ -112,7 +112,7 @@ def test_funnel_returns_clarification_when_no_kb_definition():
         '{"sql": true, "chart": false, "ml": false, "deck": false, "funnel": true, "cohort": false}',
     ]
     orc = Orchestrator(**deps)
-    result = orc.process(
+    result = await orc.process(
         _make_request(text="show funnel"),
         _make_config(SkillModule.SQL_QUERYING, SkillModule.FUNNEL_ANALYSIS),
     )
@@ -120,7 +120,7 @@ def test_funnel_returns_clarification_when_no_kb_definition():
     assert "funnel" in result.questions_asked[0].lower()
 
 
-def test_funnel_injects_kb_definition_into_context():
+async def test_funnel_injects_kb_definition_into_context():
     deps = _make_orc_deps()
     # retriever.search returns funnel definition on second call (first call is general context)
     call_count = {"n": 0}
@@ -135,7 +135,7 @@ def test_funnel_injects_kb_definition_into_context():
         "Funnel analysis complete.",
     ]
     orc = Orchestrator(**deps)
-    result = orc.process(
+    result = await orc.process(
         _make_request(text="show funnel"),
         _make_config(SkillModule.SQL_QUERYING, SkillModule.FUNNEL_ANALYSIS),
     )
@@ -173,7 +173,7 @@ def orchestrator():
            llm, retriever, clarifier, sql_agent, chart_agent
 
 
-def test_returns_clarification_state_when_unclear(orchestrator):
+async def test_returns_clarification_state_when_unclear(orchestrator):
     orch, llm, retriever, clarifier, sql_agent, chart_agent = orchestrator
     retriever.search.return_value = []
     clarifier.check.return_value = ClarificationState(
@@ -181,12 +181,12 @@ def test_returns_clarification_state_when_unclear(orchestrator):
         questions_asked=["Which time period?"], is_resolved=False,
     )
 
-    result = orch.process(make_request("show data"), make_config())
+    result = await orch.process(make_request("show data"), make_config())
     assert isinstance(result, ClarificationState)
     sql_agent.run.assert_not_called()
 
 
-def test_returns_response_when_clear(orchestrator):
+async def test_returns_response_when_clear(orchestrator):
     orch, llm, retriever, clarifier, sql_agent, chart_agent = orchestrator
     retriever.search.return_value = ["Sales table contains region and amount"]
     clarifier.check.return_value = ClarificationState(
@@ -204,13 +204,13 @@ def test_returns_response_when_clear(orchestrator):
         agent_name="chart_agent", success=True, chart_png=b"\x89PNG..."
     )
 
-    result = orch.process(make_request(), make_config())
+    result = await orch.process(make_request(), make_config())
     assert isinstance(result, Response)
     assert result.text == "Here is the sales analysis..."
     assert len(result.charts) == 1
 
 
-def test_sql_skill_disabled_skips_sql_agent(orchestrator):
+async def test_sql_skill_disabled_skips_sql_agent(orchestrator):
     orch, llm, retriever, clarifier, sql_agent, chart_agent = orchestrator
     retriever.search.return_value = []
     clarifier.check.return_value = ClarificationState(
@@ -226,12 +226,12 @@ def test_sql_skill_disabled_skips_sql_agent(orchestrator):
         account_mode="vendor", active_channels=[Channel.SLACK],
     )
 
-    result = orch.process(make_request(), config)
+    result = await orch.process(make_request(), config)
     assert isinstance(result, Response)
     sql_agent.run.assert_not_called()
 
 
-def test_orchestrator_dispatches_ml_agent_when_forecast_request():
+async def test_orchestrator_dispatches_ml_agent_when_forecast_request():
     mock_llm = MagicMock()
     mock_llm.complete.side_effect = [
         '{"sql": true, "chart": false, "ml": true, "deck": false}',  # _plan
@@ -275,13 +275,13 @@ def test_orchestrator_dispatches_ml_agent_when_forecast_request():
         timestamp="2026-05-13T00:00:00",
         client_id="client1",
     )
-    result = orchestrator.process(request, config)
+    result = await orchestrator.process(request, config)
     mock_ml_agent.run.assert_called_once()
     assert isinstance(result, Response)
     assert len(result.charts) > 0
 
 
-def test_orchestrator_dispatches_deck_agent_when_deck_request():
+async def test_orchestrator_dispatches_deck_agent_when_deck_request():
     mock_llm = MagicMock()
     mock_llm.complete.side_effect = [
         '{"sql": false, "chart": false, "ml": false, "deck": true}',  # _plan
@@ -315,7 +315,14 @@ def test_orchestrator_dispatches_deck_agent_when_deck_request():
         timestamp="2026-05-13T00:00:00",
         client_id="client1",
     )
-    result = orchestrator.process(request, config)
+    result = await orchestrator.process(request, config)
     mock_deck_agent.run.assert_called_once()
     assert isinstance(result, Response)
     assert result.deck_pptx == b"PPTX"
+
+
+async def test_process_is_awaitable():
+    deps = _make_orc_deps()
+    orc = Orchestrator(**deps)
+    result = await orc.process(_make_request(), _make_config(SkillModule.SQL_QUERYING))
+    assert isinstance(result, Response)

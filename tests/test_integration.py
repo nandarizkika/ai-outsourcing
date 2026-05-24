@@ -96,9 +96,9 @@ def make_request(text: str = "show total sales by region for last month"):
     )
 
 
-def test_clear_request_returns_response_with_chart(full_system):
+async def test_clear_request_returns_response_with_chart(full_system):
     orchestrator, config = full_system
-    result = orchestrator.process(make_request(), config)
+    result = await orchestrator.process(make_request(), config)
 
     assert isinstance(result, Response)
     assert "Jakarta" in result.text or "sales" in result.text.lower()
@@ -106,12 +106,12 @@ def test_clear_request_returns_response_with_chart(full_system):
     assert result.charts[0][:4] == b"\x89PNG"
 
 
-def test_ambiguous_request_returns_clarification(full_system, mocker):
+async def test_ambiguous_request_returns_clarification(full_system, mocker):
     orchestrator, config = full_system
     orchestrator._clarifier._llm.complete.side_effect = [
         '{"is_clear": false, "questions": ["Which time period?", "All regions or specific?"]}',
     ]
-    result = orchestrator.process(make_request("show me the data"), config)
+    result = await orchestrator.process(make_request("show me the data"), config)
 
     assert isinstance(result, ClarificationState)
     assert result.is_resolved is False

@@ -1,5 +1,9 @@
+import asyncio
 import json
+import logging
 import uuid
+
+_logger = logging.getLogger(__name__)
 
 from src.core.llm import LLMRouter
 from src.core.models import (
@@ -69,7 +73,13 @@ class Orchestrator:
         raw = self._llm.complete(TaskType.SIMPLE, system, f"Request: {request.text}")
         return raw.strip().lower().startswith("true")
 
-    def process(
+    async def _run_stage(self, callables: list) -> list:
+        return await asyncio.gather(
+            *[asyncio.to_thread(fn) for fn in callables],
+            return_exceptions=True,
+        )
+
+    async def process(
         self,
         request: Request,
         config: ClientConfig,
@@ -77,7 +87,6 @@ class Orchestrator:
     ) -> "Response | ClarificationState | AnalystResult":
         context = self._retriever.search(config.client_id, request.text)
 
-        # Deep dive confirmation flow
         if (
             self._analyst_agent is not None
             and SkillModule.DEEP_ANALYSIS in config.enabled_skills
@@ -92,18 +101,23 @@ class Orchestrator:
             )
         ):
             checkpoints: list[str] = []
-            return self._analyst_agent.run_deep(
-                request=request,
-                config=config,
-                on_checkpoint=lambda step, thought: checkpoints.append(f"Step {step}: {thought}"),
+            return await asyncio.to_thread(
+                lambda: self._analyst_agent.run_deep(
+                    request=request,
+                    config=config,
+                    on_checkpoint=lambda step, thought: checkpoints.append(
+                        f"Step {step}: {thought}"
+                    ),
+                )
             )
 
-        state = self._clarifier.check(request, context, clarification_state)
+        state = await asyncio.to_thread(
+            self._clarifier.check, request, context, clarification_state
+        )
 
         if not state.is_resolved:
             return state
 
-        # Deep intent detection — only on first call (no existing clarification_state)
         if (
             self._analyst_agent is not None
             and SkillModule.DEEP_ANALYSIS in config.enabled_skills
@@ -119,33 +133,33 @@ class Orchestrator:
             deep_state.is_resolved = False
             return deep_state
 
-        plan = self._plan(request, context)
+        # Stage 1 — Plan
+        plan = await asyncio.to_thread(self._plan, request, context)
         charts: list[bytes] = []
         sql_data: dict | None = None
         sql_queries: list[str] = []
         anomalies: list[dict] = []
 
-        # Spreadsheet routing — takes priority over SQL if file attached
+        # Spreadsheet — alternative data source when file attached (sequential)
         if (
             request.file_bytes is not None
             and request.filename is not None
             and self._spreadsheet_agent is not None
             and SkillModule.SPREADSHEET_ANALYSIS in config.enabled_skills
         ):
-            sheet_result = self._spreadsheet_agent.run(
-                file_bytes=request.file_bytes,
-                filename=request.filename,
-                question=request.text,
-                config=config,
+            sheet_result = await asyncio.to_thread(
+                lambda: self._spreadsheet_agent.run(
+                    file_bytes=request.file_bytes,
+                    filename=request.filename,
+                    question=request.text,
+                    config=config,
+                )
             )
             if sheet_result.success:
                 sql_data = sheet_result.data
 
-        # Funnel: look up stages in KB first; clarify if not defined
-        if (
-            plan.get("funnel")
-            and SkillModule.FUNNEL_ANALYSIS in config.enabled_skills
-        ):
+        # Funnel KB lookup (sequential — may return early with clarification)
+        if plan.get("funnel") and SkillModule.FUNNEL_ANALYSIS in config.enabled_skills:
             funnel_docs = self._retriever.search(
                 config.client_id, "funnel stages conversion steps flow"
             )
@@ -160,6 +174,7 @@ class Orchestrator:
                 funnel_state.is_resolved = False
                 return funnel_state
 
+        # SQL — sequential data fetch
         if plan.get("sql") and SkillModule.SQL_QUERYING in config.enabled_skills:
             analysis_mode = None
             if plan.get("funnel") and SkillModule.FUNNEL_ANALYSIS in config.enabled_skills:
@@ -174,124 +189,142 @@ class Orchestrator:
                     sql_agent = SQLAgent(llm=self._llm, connector=connector)
 
             if sql_agent is not None:
-                sql_result = sql_agent.run(
-                    config.client_id, request.text, context, analysis_mode=analysis_mode
+                _mode = analysis_mode
+                sql_result = await asyncio.to_thread(
+                    lambda: sql_agent.run(
+                        config.client_id, request.text, context, analysis_mode=_mode
+                    )
                 )
                 if sql_result.success:
                     sql_data = sql_result.data
                     if sql_data and sql_data.get("query"):
                         sql_queries.append(sql_data["query"])
 
-                    if plan.get("chart") and SkillModule.DATA_VISUALIZATION in config.enabled_skills and sql_data:
-                        chart_result = self._chart_agent.run(sql_data)
-                        if chart_result.success and chart_result.chart_png:
-                            charts.append(chart_result.chart_png)
+        # Stage 3 — Analysis agents (sequential for now; parallelised in Task 2)
+        if sql_data:
+            anomaly_skill = (
+                SkillModule.HARD_RULE_ANOMALY in config.enabled_skills
+                or SkillModule.STATISTICAL_ANOMALY in config.enabled_skills
+            )
+            if self._chart_agent is not None and SkillModule.DATA_VISUALIZATION in config.enabled_skills:
+                chart_result = await asyncio.to_thread(
+                    lambda: self._chart_agent.run(sql_data)
+                )
+                if chart_result.success and chart_result.chart_png:
+                    charts.append(chart_result.chart_png)
 
-        # Anomaly detection — runs on sql_data when skill enabled
-        anomaly_skill_enabled = (
-            SkillModule.HARD_RULE_ANOMALY in config.enabled_skills
-            or SkillModule.STATISTICAL_ANOMALY in config.enabled_skills
+            if self._anomaly_agent is not None and anomaly_skill:
+                mode = (
+                    "both"
+                    if SkillModule.HARD_RULE_ANOMALY in config.enabled_skills
+                    and SkillModule.STATISTICAL_ANOMALY in config.enabled_skills
+                    else "hard"
+                    if SkillModule.HARD_RULE_ANOMALY in config.enabled_skills
+                    else "statistical"
+                )
+                _amode = mode
+                anomaly_result = await asyncio.to_thread(
+                    lambda: self._anomaly_agent.run(config.client_id, sql_data, mode=_amode)
+                )
+                if anomaly_result.success:
+                    anomalies = anomaly_result.data.get("anomalies", [])
+
+            if (
+                plan.get("ml")
+                and self._ml_agent is not None
+                and SkillModule.MACHINE_LEARNING in config.enabled_skills
+            ):
+                ml_result = await asyncio.to_thread(
+                    lambda: self._ml_agent.run(config.client_id, request.text, sql_data)
+                )
+                if ml_result.success and ml_result.chart_png:
+                    charts.append(ml_result.chart_png)
+
+            if (
+                plan.get("hypothesis")
+                and self._hypothesis_agent is not None
+                and SkillModule.HYPOTHESIS_TESTING in config.enabled_skills
+            ):
+                hyp_result = await asyncio.to_thread(
+                    lambda: self._hypothesis_agent.run(config.client_id, request.text, sql_data)
+                )
+                if hyp_result.success:
+                    sql_data = {**(sql_data or {}), **hyp_result.data}
+
+            if (
+                plan.get("segment")
+                and self._segmentation_agent is not None
+                and SkillModule.SEGMENTATION in config.enabled_skills
+            ):
+                seg_result = await asyncio.to_thread(
+                    lambda: self._segmentation_agent.run(config.client_id, request.text, sql_data)
+                )
+                if seg_result.success:
+                    if seg_result.chart_png:
+                        charts.append(seg_result.chart_png)
+                    sql_data = {**(sql_data or {}), **seg_result.data}
+
+            if (
+                plan.get("ab_test")
+                and self._ab_agent is not None
+                and SkillModule.AB_TESTING in config.enabled_skills
+            ):
+                ab_result = await asyncio.to_thread(
+                    lambda: self._ab_agent.run(config.client_id, request.text, sql_data)
+                )
+                if ab_result.success:
+                    sql_data = {**(sql_data or {}), **ab_result.data}
+
+        # Stage 3b — Generate response (sequential LLM call)
+        text = await asyncio.to_thread(
+            self._generate_response, request, context, sql_data, state.assumptions
         )
-        if self._anomaly_agent is not None and anomaly_skill_enabled and sql_data:
-            if (SkillModule.HARD_RULE_ANOMALY in config.enabled_skills
-                    and SkillModule.STATISTICAL_ANOMALY in config.enabled_skills):
-                mode = "both"
-            elif SkillModule.HARD_RULE_ANOMALY in config.enabled_skills:
-                mode = "hard"
-            else:
-                mode = "statistical"
-            anomaly_result = self._anomaly_agent.run(config.client_id, sql_data, mode=mode)
-            if anomaly_result.success:
-                anomalies = anomaly_result.data.get("anomalies", [])
 
-        # ML Agent — runs on SQL data when forecast/prediction requested
-        if (
-            plan.get("ml")
-            and self._ml_agent is not None
-            and SkillModule.MACHINE_LEARNING in config.enabled_skills
-            and sql_data
-        ):
-            ml_result = self._ml_agent.run(config.client_id, request.text, sql_data)
-            if ml_result.success and ml_result.chart_png:
-                charts.append(ml_result.chart_png)
-
-        # Hypothesis testing — runs on sql_data when skill enabled
-        if (
-            plan.get("hypothesis")
-            and self._hypothesis_agent is not None
-            and SkillModule.HYPOTHESIS_TESTING in config.enabled_skills
-            and sql_data
-        ):
-            hyp_result = self._hypothesis_agent.run(config.client_id, request.text, sql_data)
-            if hyp_result.success:
-                sql_data = {**(sql_data or {}), **hyp_result.data}
-
-        # Segmentation — runs on sql_data when skill enabled
-        if (
-            plan.get("segment")
-            and self._segmentation_agent is not None
-            and SkillModule.SEGMENTATION in config.enabled_skills
-            and sql_data
-        ):
-            seg_result = self._segmentation_agent.run(config.client_id, request.text, sql_data)
-            if seg_result.success:
-                if seg_result.chart_png:
-                    charts.append(seg_result.chart_png)
-                sql_data = {**(sql_data or {}), **seg_result.data}
-
-        # A/B testing — runs on sql_data when skill enabled
-        if (
-            plan.get("ab_test")
-            and self._ab_agent is not None
-            and SkillModule.AB_TESTING in config.enabled_skills
-            and sql_data
-        ):
-            ab_result = self._ab_agent.run(config.client_id, request.text, sql_data)
-            if ab_result.success:
-                sql_data = {**(sql_data or {}), **ab_result.data}
-
-        text = self._generate_response(request, context, sql_data, state.assumptions)
-
-        # Report Agent — formats analysis into Markdown + HTML when skill enabled
+        # Stage 4 — Output agents (sequential for now; parallelised in Task 3)
         report_markdown: str | None = None
         report_html: str | None = None
+        deck_pptx: bytes | None = None
+
         if (
             plan.get("report")
             and self._report_agent is not None
             and SkillModule.REPORT_GENERATION in config.enabled_skills
         ):
-            report_result = self._report_agent.run(
-                config.client_id,
-                request.text,
-                {
-                    "analysis_text": text,
-                    "sql_rows": (sql_data.get("rows", []) or [])[:10] if sql_data else [],
-                    "anomalies": anomalies,
-                },
+            report_result = await asyncio.to_thread(
+                lambda: self._report_agent.run(
+                    config.client_id,
+                    request.text,
+                    {
+                        "analysis_text": text,
+                        "sql_rows": (sql_data.get("rows", []) or [])[:10] if sql_data else [],
+                        "anomalies": anomalies,
+                    },
+                )
             )
             if report_result.success:
                 report_markdown = report_result.data["markdown"]
                 report_html = report_result.data["html"]
 
-        # Deck Agent — builds PPTX via storyline (LLM) or fallback flat sections
-        deck_pptx: bytes | None = None
         if (
             plan.get("deck")
             and self._deck_agent is not None
             and SkillModule.PRESENTATION_BUILDING in config.enabled_skills
         ):
             findings = (
-                [f"{r}" for r in (sql_data.get("rows", []) or [])[:5]]
-                if sql_data else []
+                [f"{r}" for r in (sql_data.get("rows", []) or [])[:5]] if sql_data else []
             )
-            storyline = self._deck_agent.build_storyline(
-                analysis_text=text,
-                findings=findings,
-                solutions=[],
-                recommendation="",
+            storyline = await asyncio.to_thread(
+                lambda: self._deck_agent.build_storyline(
+                    analysis_text=text,
+                    findings=findings,
+                    solutions=[],
+                    recommendation="",
+                )
             )
-            deck_result = self._deck_agent.run(
-                title=request.text[:100], storyline=storyline, charts=charts
+            deck_result = await asyncio.to_thread(
+                lambda: self._deck_agent.run(
+                    title=request.text[:100], storyline=storyline, charts=charts
+                )
             )
             if deck_result.success:
                 deck_pptx = deck_result.deck_pptx
@@ -307,7 +340,6 @@ class Orchestrator:
             report_html=report_html,
         )
 
-        # Interaction memory — always log when logger configured
         if self._memory_logger is not None:
             self._memory_logger.log(
                 request=request,

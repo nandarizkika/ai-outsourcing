@@ -63,7 +63,7 @@ def _make_orchestrator(anomaly_agent=None, memory_logger=None, retriever_search=
     )
 
 
-def test_anomaly_agent_flags_critical_breach_in_response():
+async def test_anomaly_agent_flags_critical_breach_in_response():
     mock_retriever = MagicMock(spec=KnowledgeRetriever)
     mock_retriever.search.return_value = [
         json.dumps({"metric": "churn", "operator": ">", "threshold": 0.10, "severity": "critical"})
@@ -71,28 +71,28 @@ def test_anomaly_agent_flags_critical_breach_in_response():
     anomaly_agent = AnomalyAgent(retriever=mock_retriever)
     orc = _make_orchestrator(anomaly_agent=anomaly_agent)
     config = _make_config(SkillModule.SQL_QUERYING, SkillModule.HARD_RULE_ANOMALY)
-    result = orc.process(_make_request(), config)
+    result = await orc.process(_make_request(), config)
     assert isinstance(result, Response)
     assert len(result.anomalies) == 1
     assert result.anomalies[0].severity == "critical"
     assert result.anomalies[0].metric == "churn"
 
 
-def test_interaction_memory_logger_receives_log_call():
+async def test_interaction_memory_logger_receives_log_call():
     mock_logger = MagicMock(spec=InteractionMemoryLogger)
     orc = _make_orchestrator(memory_logger=mock_logger)
     config = _make_config(SkillModule.SQL_QUERYING)
-    orc.process(_make_request(text="show revenue"), config)
+    await orc.process(_make_request(text="show revenue"), config)
     mock_logger.log.assert_called_once()
     call_kwargs = mock_logger.log.call_args[1]
     assert call_kwargs["request"].text == "show revenue"
     assert "SELECT churn FROM metrics" in call_kwargs["sql_queries"]
 
 
-def test_no_anomalies_when_skill_not_in_config():
+async def test_no_anomalies_when_skill_not_in_config():
     mock_anomaly = MagicMock(spec=AnomalyAgent)
     orc = _make_orchestrator(anomaly_agent=mock_anomaly)
     config = _make_config(SkillModule.SQL_QUERYING)
-    result = orc.process(_make_request(), config)
+    result = await orc.process(_make_request(), config)
     mock_anomaly.run.assert_not_called()
     assert result.anomalies == []
