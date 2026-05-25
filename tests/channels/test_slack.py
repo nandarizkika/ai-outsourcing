@@ -1,5 +1,5 @@
 from datetime import datetime
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 from src.channels.slack import SlackChannel
 from src.core.models import (
     Request, Channel, ClientConfig, Tier, ClarificationState, Response
@@ -122,7 +122,7 @@ def test_ticketing_service_called_on_mention():
     mock_ticketing = MagicMock()
     mock_ticketing.create_for_request.return_value = MagicMock(key="AI-7", url="...", summary="x")
     channel, mock_orchestrator = _make_channel(ticketing=mock_ticketing)
-    mock_orchestrator.process.return_value = Response(request_id="r1", text="done", charts=[])
+    mock_orchestrator.process = AsyncMock(return_value=Response(request_id="r1", text="done", charts=[]))
     event = {"user": "U123", "text": "<@BOTID> show me revenue", "channel": "C1", "ts": "1.0", "team": "T001"}
     say = MagicMock()
     channel._handle_mention(event, say)
@@ -133,7 +133,7 @@ def test_ticket_key_prepended_to_reply():
     mock_ticketing = MagicMock()
     mock_ticketing.create_for_request.return_value = MagicMock(key="AI-99", url="...", summary="x")
     channel, mock_orchestrator = _make_channel(ticketing=mock_ticketing)
-    mock_orchestrator.process.return_value = Response(request_id="r1", text="Analysis done", charts=[])
+    mock_orchestrator.process = AsyncMock(return_value=Response(request_id="r1", text="Analysis done", charts=[]))
     event = {"user": "U123", "text": "<@BOTID> analyse churn", "channel": "C1", "ts": "1.0", "team": "T001"}
     say = MagicMock()
     channel._handle_mention(event, say)

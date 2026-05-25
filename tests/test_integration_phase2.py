@@ -5,7 +5,7 @@ Full path: channel event → TicketingService (real) → JiraClient (mocked)
 """
 
 from email.mime.text import MIMEText
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -61,11 +61,11 @@ def test_slack_end_to_end_with_ticketing():
 
     # Mock orchestrator returns a clean response
     mock_orchestrator = MagicMock()
-    mock_orchestrator.process.return_value = Response(
+    mock_orchestrator.process = AsyncMock(return_value=Response(
         request_id="r1",
         text="Revenue for Q1 is 500M",
         charts=[],
-    )
+    ))
 
     # Real ClientConfig — _handle_mention looks up by team ID ("T001")
     config = _make_client_config("client1")
@@ -117,11 +117,11 @@ def test_email_end_to_end_with_ticketing():
     ticketing = TicketingService(jira_client=mock_jira_client)
 
     mock_orchestrator = MagicMock()
-    mock_orchestrator.process.return_value = Response(
+    mock_orchestrator.process = AsyncMock(return_value=Response(
         request_id="r2",
         text="Churn rate is 5%",
         charts=[],
-    )
+    ))
 
     # EmailChannel uses client_configs as a plain dict — MagicMock is fine here
     # because poll_once only calls client_configs.get(client_id) and passes the

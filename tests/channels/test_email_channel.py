@@ -1,6 +1,6 @@
 import email as email_lib
 from email.mime.text import MIMEText
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import AsyncMock, MagicMock, patch, call
 import pytest
 
 from src.channels.email_channel import EmailChannel
@@ -35,9 +35,9 @@ def _make_raw_email(subject="Analyse revenue", body="Show Q1 revenue", from_addr
 
 def test_poll_processes_unread_email():
     channel, mock_orchestrator = _make_channel()
-    mock_orchestrator.process.return_value = Response(
+    mock_orchestrator.process = AsyncMock(return_value=Response(
         request_id="r1", text="Q1 revenue is 100M", charts=[]
-    )
+    ))
     raw = _make_raw_email()
     with patch("imaplib.IMAP4_SSL") as mock_imap_cls, \
          patch("smtplib.SMTP") as mock_smtp_cls:
@@ -57,9 +57,9 @@ def test_poll_processes_unread_email():
 def test_poll_attaches_chart_png():
     channel, mock_orchestrator = _make_channel()
     png_bytes = b"\x89PNG\r\n\x1a\n" + b"\x00" * 20
-    mock_orchestrator.process.return_value = Response(
+    mock_orchestrator.process = AsyncMock(return_value=Response(
         request_id="r1", text="Here is the chart", charts=[png_bytes]
-    )
+    ))
     raw = _make_raw_email()
     with patch("imaplib.IMAP4_SSL") as mock_imap_cls, \
          patch("smtplib.SMTP") as mock_smtp_cls:
@@ -90,9 +90,9 @@ def test_poll_no_unread_emails():
 
 def test_smtp_authenticates_with_starttls_and_login():
     channel, mock_orchestrator = _make_channel()
-    mock_orchestrator.process.return_value = Response(
+    mock_orchestrator.process = AsyncMock(return_value=Response(
         request_id="r1", text="ok", charts=[]
-    )
+    ))
     raw = _make_raw_email()
     with patch("imaplib.IMAP4_SSL") as mock_imap_cls, \
          patch("smtplib.SMTP") as mock_smtp_cls:

@@ -1,3 +1,4 @@
+import asyncio
 import email as email_lib
 import imaplib
 import logging
@@ -71,7 +72,7 @@ class EmailChannel:
                         ticket = self._ticketing.create_for_request(request)
                     except Exception as exc:
                         _logger.warning("Ticketing failed: %s", exc)
-                result = self._orchestrator.process(request, config)
+                result = asyncio.run(self._orchestrator.process(request, config))
                 self._send_reply(from_addr, message_id, result, ticket)
 
     def _extract_body(self, msg) -> str:

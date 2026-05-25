@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime
 
 from slack_bolt import App
@@ -55,7 +56,7 @@ class SlackChannel:
             except Exception:
                 pass
 
-        result = self._orchestrator.process(request, config, active_clarification)
+        result = asyncio.run(self._orchestrator.process(request, config, active_clarification))
         self._handle_result(result, event, say, ticket=ticket)
 
     def _build_request(self, event: dict, config: ClientConfig) -> Request:

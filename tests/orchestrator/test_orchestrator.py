@@ -406,3 +406,46 @@ async def test_stage4_output_agents_run_in_parallel():
     assert elapsed < 0.09, f"Expected parallel (~50ms), got {elapsed:.3f}s (sequential would be ~100ms)"
     assert result.report_markdown is not None
     assert result.deck_pptx is not None
+
+
+async def test_stage3_agents_run_in_parallel():
+    """Two Stage 3 agents sleeping 50ms each complete in under 90ms total."""
+    deps = _make_orc_deps()
+    deps["llm"].complete.side_effect = [
+        '{"sql": true, "chart": true, "ml": true, "deck": false, '
+        '"funnel": false, "cohort": false, "hypothesis": false, '
+        '"segment": false, "ab_test": false, "report": false}',
+        "Analysis complete.",
+    ]
+
+    def _slow_chart(*args, **kwargs):
+        _time.sleep(0.05)
+        return AgentResult(agent_name="chart_agent", success=True, chart_png=b"png")
+
+    def _slow_ml(*args, **kwargs):
+        _time.sleep(0.05)
+        return AgentResult(agent_name="ml_agent", success=True, chart_png=b"mlpng")
+
+    mock_chart = MagicMock()
+    mock_chart.run.side_effect = _slow_chart
+
+    mock_ml = MagicMock()
+    mock_ml.run.side_effect = _slow_ml
+
+    orc = Orchestrator(
+        **{k: v for k, v in deps.items() if k not in ("chart_agent",)},
+        chart_agent=mock_chart,
+        ml_agent=mock_ml,
+    )
+    config = _make_config(
+        SkillModule.SQL_QUERYING,
+        SkillModule.DATA_VISUALIZATION,
+        SkillModule.MACHINE_LEARNING,
+    )
+
+    start = _time.monotonic()
+    result = await orc.process(_make_request(text="show chart and forecast"), config)
+    elapsed = _time.monotonic() - start
+
+    assert elapsed < 0.09, f"Expected parallel (~50ms), got {elapsed:.3f}s"
+    assert len(result.charts) == 2
