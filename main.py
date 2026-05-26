@@ -40,8 +40,10 @@ from src.middleware.logging import RequestLoggingMiddleware
 settings = Settings()
 verify_api_key = make_verify_api_key(settings)
 llm = LLMRouter(
-    anthropic_api_key=settings.anthropic_api_key,
+    provider=settings.llm_provider,
+    gemini_api_key=settings.gemini_api_key,
     openai_api_key=settings.openai_api_key,
+    anthropic_api_key=settings.anthropic_api_key,
 )
 store = VectorStore(
     persist_dir=settings.chromadb_persist_dir,
@@ -215,10 +217,16 @@ async def analyze(request: StarletteRequest, body: AnalyzeBody, x_client_id: str
     config = registry.get(body.request.client_id)
     if config is None:
         raise HTTPException(status_code=404, detail="Client not found")
-    result = await orchestrator.process(body.request, config, body.clarification_state)
-    if hasattr(result, "model_dump"):
-        return result.model_dump()
-    return {"result": str(result)}
+    try:
+        result = await orchestrator.process(body.request, config, body.clarification_state)
+        if hasattr(result, "model_dump"):
+            return result.model_dump()
+        return {"result": str(result)}
+    except Exception as e:
+        import traceback
+        print(f"ERROR in analyze: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
 
 @app.post("/slack/events")
