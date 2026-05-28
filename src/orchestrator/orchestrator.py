@@ -318,6 +318,8 @@ class Orchestrator:
             sql_data = enriched
 
         # Stage 3b — Generate response (sequential LLM call)
+        if sql_data:
+            _logger.info(f"[ORCHESTRATOR] Generating response with {len(sql_data.get('rows', []))} SQL rows")
         text = await asyncio.to_thread(
             self._generate_response, request, context, sql_data, state.assumptions
         )
@@ -473,4 +475,6 @@ class Orchestrator:
             f"{data_summary}\n\n"
             "Write the analysis:"
         )
-        return self._llm.complete(TaskType.REASONING, system, user)
+        response = self._llm.complete(TaskType.REASONING, system, user)
+        _logger.info(f"[ORCHESTRATOR] Generated response: {response[:500]}")
+        return response

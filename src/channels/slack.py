@@ -141,6 +141,8 @@ class SlackChannel:
         )
 
     def _handle_result(self, result, event: dict, say, ticket=None) -> None:
+        import logging
+        logger = logging.getLogger(__name__)
         thread_ts = event.get("thread_ts") or event.get("ts")
 
         if isinstance(result, ClarificationState):
@@ -156,12 +158,15 @@ class SlackChannel:
         say(text=reply_text, thread_ts=thread_ts)
 
         for chart_png in result.charts:
-            self._app.client.files_upload_v2(
-                channel=event["channel"],
-                file=chart_png,
-                filename="analysis.png",
-                thread_ts=thread_ts,
-            )
+            try:
+                self._app.client.files_upload_v2(
+                    channel=event["channel"],
+                    file=chart_png,
+                    filename="analysis.png",
+                    thread_ts=thread_ts,
+                )
+            except Exception as e:
+                logger.warning(f"[Slack] Failed to upload chart: {str(e)}")
 
     def _on_unconfigured_workspace(self, say, thread_ts: str) -> None:
         say(
