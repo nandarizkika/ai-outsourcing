@@ -31,6 +31,7 @@ class SlackChannel:
             token_verification_enabled=token_verification_enabled,
         )
         self._app.event("app_mention")(self._handle_mention)
+        self._app.event("message")(self._handle_message)
         self._handler = SlackRequestHandler(self._app)
 
     def _handle_mention(self, event: dict, say) -> None:
@@ -80,6 +81,50 @@ class SlackChannel:
             logger.error(f"[Slack] EXCEPTION in handler: {str(e)}", exc_info=True)
             try:
                 say(text=f"Sorry, I encountered an error: {str(e)}", thread_ts=thread_ts)
+            except Exception as say_error:
+                logger.error(f"[Slack] Failed to send error message: {str(say_error)}")
+
+    def _handle_message(self, event: dict, say) -> None:
+        import logging
+        logger = logging.getLogger(__name__)
+
+        if event.get("bot_id"):
+            return
+
+        thread_ts = event.get("thread_ts")
+        if not thread_ts:
+            return
+
+        pending = self._pending.get(thread_ts)
+        if not pending or pending.is_resolved:
+            return
+
+        logger.info(f"[Slack] ===== MESSAGE HANDLER: PROCESSING CLARIFICATION RESPONSE =====")
+        logger.info(f"[Slack] Thread: {thread_ts}, User: {event.get('user')}, Text: {event.get('text', '')}")
+
+        team_id = event.get("team")
+        config = self._client_configs.get(team_id)
+
+        if not config:
+            logger.warning(f"[Slack] No config found for team_id={team_id} in message handler")
+            return
+
+        try:
+            request = self._build_request(event, config)
+            logger.info(f"[Slack] Built request from clarification response: {request.text}")
+
+            pending.answers_received.append(request.text)
+
+            logger.info(f"[Slack] Calling orchestrator.process() with clarification state...")
+            result = asyncio.run(self._orchestrator.process(request, config, pending))
+            logger.info(f"[Slack] Orchestrator returned: {type(result).__name__}")
+
+            self._handle_result(result, event, say)
+            logger.info(f"[Slack] Clarification response processed successfully")
+        except Exception as e:
+            logger.error(f"[Slack] EXCEPTION in clarification handler: {str(e)}", exc_info=True)
+            try:
+                say(text=f"Sorry, I encountered an error processing your response: {str(e)}", thread_ts=thread_ts)
             except Exception as say_error:
                 logger.error(f"[Slack] Failed to send error message: {str(say_error)}")
 
