@@ -142,19 +142,27 @@ class SlackChannel:
 
     def _handle_result(self, result, event: dict, say, ticket=None) -> None:
         import logging
+        from src.formatters.slack_formatter import SlackFormatter
         logger = logging.getLogger(__name__)
         thread_ts = event.get("thread_ts") or event.get("ts")
 
         if isinstance(result, ClarificationState):
             self._pending[thread_ts] = result
-            questions = "\n".join(f"• {q}" for q in result.questions_asked[-2:])
-            say(text=f"Quick question before I run this:\n{questions}", thread_ts=thread_ts)
+            questions = "\n".join(f"{q}" for q in result.questions_asked)
+            say(text=questions, thread_ts=thread_ts)
             return
 
         if thread_ts in self._pending:
             del self._pending[thread_ts]
 
-        reply_text = f"[{ticket.key}] {result.text}" if ticket is not None else result.text
+        request = None
+        if isinstance(result, dict) and "request" in result:
+            request = result["request"]
+
+        reply_text = result.text
+        if ticket is not None:
+            reply_text = f"[{ticket.key}] {reply_text}"
+
         say(text=reply_text, thread_ts=thread_ts)
 
         for chart_png in result.charts:
@@ -167,6 +175,23 @@ class SlackChannel:
                 )
             except Exception as e:
                 logger.warning(f"[Slack] Failed to upload chart: {str(e)}")
+
+        if result.report_markdown:
+            try:
+                say(text=result.report_markdown, thread_ts=thread_ts)
+            except Exception as e:
+                logger.warning(f"[Slack] Failed to send report: {str(e)}")
+
+        if result.deck_pptx:
+            try:
+                self._app.client.files_upload_v2(
+                    channel=event["channel"],
+                    file=result.deck_pptx,
+                    filename="presentation.pptx",
+                    thread_ts=thread_ts,
+                )
+            except Exception as e:
+                logger.warning(f"[Slack] Failed to upload presentation: {str(e)}")
 
     def _on_unconfigured_workspace(self, say, thread_ts: str) -> None:
         say(

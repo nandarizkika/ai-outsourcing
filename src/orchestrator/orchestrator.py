@@ -138,6 +138,10 @@ class Orchestrator:
             deep_state.is_resolved = False
             return deep_state
 
+        if clarification_state is None or not clarification_state.selected_deliverable:
+            deliverable_state = await asyncio.to_thread(self._ask_for_deliverable, request)
+            return deliverable_state
+
         # Stage 1 — Plan
         plan = await asyncio.to_thread(self._plan, request, context)
         _logger.info(f"[ORCHESTRATOR] Plan decision: {plan}")
@@ -417,6 +421,41 @@ class Orchestrator:
             )
 
         return response
+
+    def _suggest_deliverable_type(self, request: Request) -> "DeliverableType":
+        from src.core.models import DeliverableType
+
+        text_lower = request.text.lower()
+
+        if any(word in text_lower for word in ["chart", "visualiz", "graph", "trend", "plot"]):
+            return DeliverableType.DASHBOARD
+        elif any(word in text_lower for word in ["summary", "detail", "report", "comprehensive", "full"]):
+            return DeliverableType.REPORT
+        elif any(word in text_lower for word in ["presentation", "slide", "deck", "powerpoint"]):
+            return DeliverableType.SLIDES
+        elif any(word in text_lower for word in ["alert", "rule", "anomal", "threshold", "warning"]):
+            return DeliverableType.RULES
+
+        return DeliverableType.ANALYSIS
+
+    def _ask_for_deliverable(self, request: Request) -> ClarificationState:
+        from src.core.models import DeliverableType
+
+        suggested = self._suggest_deliverable_type(request)
+
+        state = ClarificationState(original_request=request)
+        state.deliverable_pending = True
+        state.is_resolved = False
+        state.questions_asked = [
+            f"What format would you like for the analysis? (I suggest {suggested.value})\n"
+            "• 📊 analysis (text + charts)\n"
+            "• 📈 dashboard (visualization-focused)\n"
+            "• 📋 report (detailed markdown)\n"
+            "• 🎨 slides (powerpoint presentation)\n"
+            "• 📌 rules (anomalies & alerts)"
+        ]
+
+        return state
 
     def _plan(self, request: Request, context: list[str]) -> dict:
         system = (
