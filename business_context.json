@@ -1,223 +1,483 @@
 {
+  "extraction_stats": {
+    "total_queries_analyzed": 28008,
+    "unique_relationships": 885
+  },
   "business_glossary": {
     "GMV": {
       "name": "Gross Merchandise Value",
       "definition": "Total transaction value across all orders",
       "calculation": "SUM(amount_base) from transaction tables",
       "filters": [
-        "status = 'SUCCESS'",
-        "created_at >= date_range"
+        "status = 'SUCCESS'"
       ]
     },
     "active_users": {
       "name": "Active Users",
       "definition": "Users with at least one successful transaction",
-      "calculation": "COUNT(DISTINCT user_id)"
+      "calculation": "COUNT(DISTINCT user_id)",
+      "filters": [
+        "status = 'SUCCESS'"
+      ]
     },
     "AOV": {
       "name": "Average Order Value",
       "definition": "Mean transaction value",
-      "calculation": "AVG(amount_base)"
+      "calculation": "AVG(amount_base)",
+      "filters": [
+        "status = 'SUCCESS'"
+      ]
+    },
+    "conversion_rate": {
+      "name": "Conversion Rate",
+      "definition": "Percentage of orders completed successfully",
+      "calculation": "COUNT(CASE WHEN status='SUCCESS') / COUNT(*) * 100"
     }
   },
   "table_relationships": [
     {
-      "table1": "retail_order_data_opentable",
-      "table2": "retail_visit_ssot_opentable",
-      "join_conditions": [
-        "JOIN found in successful queries"
-      ],
-      "frequency": 0
+      "table1": "fs_loan_users",
+      "table2": "fs_submissions",
+      "frequency": 5398,
+      "join_conditions": []
     },
     {
-      "table1": "edc_order_delivery_funnel_opentable",
-      "table2": "ms_visit_ssot_opentable",
-      "join_conditions": [
-        "JOIN found in successful queries"
-      ],
-      "frequency": 0
+      "table1": "ms_merchant_profiling_ssot_opentable",
+      "table2": "retail_visit_ssot_opentable",
+      "frequency": 4402,
+      "join_conditions": []
+    },
+    {
+      "table1": "ms_merchant_profiling_ssot_opentable",
+      "table2": "retail_transaction_data",
+      "frequency": 4178,
+      "join_conditions": []
+    },
+    {
+      "table1": "retail_order_delivery_funnel",
+      "table2": "retail_transaction_data",
+      "frequency": 4176,
+      "join_conditions": []
+    },
+    {
+      "table1": "ms_merchant_profiling_ssot_opentable",
+      "table2": "retail_order_delivery_funnel",
+      "frequency": 4176,
+      "join_conditions": []
+    },
+    {
+      "table1": "fs_loan_users",
+      "table2": "fs_loans",
+      "frequency": 3170,
+      "join_conditions": []
+    },
+    {
+      "table1": "retail_order_data_opentable",
+      "table2": "retail_visit_ssot_opentable",
+      "frequency": 2902,
+      "join_conditions": []
+    },
+    {
+      "table1": "loan_users",
+      "table2": "ms_visit_ssot",
+      "frequency": 1733,
+      "join_conditions": []
+    },
+    {
+      "table1": "edc_order_delivery_funnel",
+      "table2": "loan_users",
+      "frequency": 1681,
+      "join_conditions": []
     },
     {
       "table1": "edc_order_delivery_funnel_opentable",
       "table2": "edc_transaction_level_opentable",
-      "join_conditions": [
-        "JOIN found in successful queries"
-      ],
-      "frequency": 0
+      "frequency": 1676,
+      "join_conditions": []
     },
     {
-      "table1": "fs_loans",
-      "table2": "merchant_address",
-      "join_conditions": [
-        "JOIN found in successful queries"
-      ],
-      "frequency": 0
+      "table1": "edc_order_delivery_funnel",
+      "table2": "ms_visit_ssot",
+      "frequency": 1671,
+      "join_conditions": []
     },
     {
-      "table1": "fs_loan_users",
-      "table2": "merchant_address",
-      "join_conditions": [
-        "JOIN found in successful queries"
-      ],
-      "frequency": 0
+      "table1": "edc_order_delivery_funnel_opentable",
+      "table2": "ms_visit_ssot_opentable",
+      "frequency": 1291,
+      "join_conditions": []
     },
     {
-      "table1": "fs_credit_memo",
-      "table2": "merchant_address",
-      "join_conditions": [
-        "JOIN found in successful queries"
-      ],
-      "frequency": 0
+      "table1": "edc_transaction_level",
+      "table2": "loan_users",
+      "frequency": 1229,
+      "join_conditions": []
     },
     {
-      "table1": "merchant_address",
-      "table2": "ms_merchant_profiling_ssot_opentable",
-      "join_conditions": [
-        "JOIN found in successful queries"
-      ],
-      "frequency": 0
+      "table1": "edc_transaction_level",
+      "table2": "user_profile_datamart_v2",
+      "frequency": 1206,
+      "join_conditions": []
     },
     {
-      "table1": "merchant_address",
-      "table2": "merchant_data",
-      "join_conditions": [
-        "JOIN found in successful queries"
-      ],
-      "frequency": 0
+      "table1": "edc_transaction_level",
+      "table2": "submissions",
+      "frequency": 1192,
+      "join_conditions": []
     },
     {
-      "table1": "fs_loan_users",
-      "table2": "fs_loans",
-      "join_conditions": [
-        "JOIN found in successful queries"
-      ],
-      "frequency": 0
+      "table1": "loan_users",
+      "table2": "submissions",
+      "frequency": 1176,
+      "join_conditions": []
     },
     {
-      "table1": "fs_credit_memo",
-      "table2": "fs_loans",
-      "join_conditions": [
-        "JOIN found in successful queries"
-      ],
-      "frequency": 0
+      "table1": "edc_order_delivery_funnel_opentable",
+      "table2": "location_gmaps_static_opentable",
+      "frequency": 1169,
+      "join_conditions": []
     },
     {
-      "table1": "fs_loans",
-      "table2": "ms_merchant_profiling_ssot_opentable",
-      "join_conditions": [
-        "JOIN found in successful queries"
-      ],
-      "frequency": 0
+      "table1": "loan_users",
+      "table2": "user_profile_datamart_v2",
+      "frequency": 1149,
+      "join_conditions": []
     },
     {
-      "table1": "fs_loans",
-      "table2": "merchant_data",
-      "join_conditions": [
-        "JOIN found in successful queries"
-      ],
-      "frequency": 0
+      "table1": "location_gmaps_static_opentable",
+      "table2": "ms_visit_ssot",
+      "frequency": 1119,
+      "join_conditions": []
     },
     {
-      "table1": "fs_credit_memo",
-      "table2": "fs_loan_users",
-      "join_conditions": [
-        "JOIN found in successful queries"
-      ],
-      "frequency": 0
+      "table1": "location_gmaps_static_opentable",
+      "table2": "partnership_ssot",
+      "frequency": 1111,
+      "join_conditions": []
     },
     {
-      "table1": "fs_loan_users",
-      "table2": "ms_merchant_profiling_ssot_opentable",
-      "join_conditions": [
-        "JOIN found in successful queries"
-      ],
-      "frequency": 0
+      "table1": "edc_transaction_level",
+      "table2": "kyc_kyb_attempt",
+      "frequency": 1103,
+      "join_conditions": []
     },
     {
-      "table1": "fs_loan_users",
-      "table2": "merchant_data",
-      "join_conditions": [
-        "JOIN found in successful queries"
-      ],
-      "frequency": 0
+      "table1": "kyc_kyb_attempt",
+      "table2": "ms_visit_ssot",
+      "frequency": 1094,
+      "join_conditions": []
     },
     {
-      "table1": "fs_credit_memo",
-      "table2": "ms_merchant_profiling_ssot_opentable",
-      "join_conditions": [
-        "JOIN found in successful queries"
-      ],
-      "frequency": 0
+      "table1": "location_gmaps_static_opentable",
+      "table2": "submissions",
+      "frequency": 1092,
+      "join_conditions": []
     },
     {
-      "table1": "fs_credit_memo",
-      "table2": "merchant_data",
-      "join_conditions": [
-        "JOIN found in successful queries"
-      ],
-      "frequency": 0
+      "table1": "edc_transaction_level",
+      "table2": "ms_visit_ssot",
+      "frequency": 1089,
+      "join_conditions": []
     },
     {
-      "table1": "merchant_data",
-      "table2": "ms_merchant_profiling_ssot_opentable",
-      "join_conditions": [
-        "JOIN found in successful queries"
-      ],
-      "frequency": 0
+      "table1": "ms_visit_ssot",
+      "table2": "submissions",
+      "frequency": 1087,
+      "join_conditions": []
     },
     {
-      "table1": "fs_loan_users",
-      "table2": "fs_submissions",
-      "join_conditions": [
-        "JOIN found in successful queries"
-      ],
-      "frequency": 0
+      "table1": "edc_transaction_level",
+      "table2": "location_gmaps_static_opentable",
+      "frequency": 1085,
+      "join_conditions": []
     },
     {
-      "table1": "order_payments",
-      "table2": "payments_ssot",
-      "join_conditions": [
-        "JOIN found in successful queries"
-      ],
-      "frequency": 0
+      "table1": "ms_visit_ssot",
+      "table2": "partnership_ssot",
+      "frequency": 1082,
+      "join_conditions": []
+    },
+    {
+      "table1": "edc_order_delivery_funnel",
+      "table2": "submissions",
+      "frequency": 1075,
+      "join_conditions": []
+    },
+    {
+      "table1": "loan_users",
+      "table2": "location_gmaps_static_opentable",
+      "frequency": 1071,
+      "join_conditions": []
+    },
+    {
+      "table1": "edc_order_delivery_funnel",
+      "table2": "location_gmaps_static_opentable",
+      "frequency": 1061,
+      "join_conditions": []
+    },
+    {
+      "table1": "edc_order_delivery_funnel",
+      "table2": "edc_transaction_level",
+      "frequency": 1061,
+      "join_conditions": []
+    },
+    {
+      "table1": "edc_order_delivery_funnel_opentable",
+      "table2": "edc_transaction_level",
+      "frequency": 1059,
+      "join_conditions": []
+    },
+    {
+      "table1": "edc_order_delivery_funnel",
+      "table2": "user_profile_datamart_v2",
+      "frequency": 1057,
+      "join_conditions": []
+    },
+    {
+      "table1": "submissions",
+      "table2": "user_profile_datamart_v2",
+      "frequency": 1052,
+      "join_conditions": []
+    },
+    {
+      "table1": "edc_order_delivery_funnel",
+      "table2": "edc_order_delivery_funnel_opentable",
+      "frequency": 1051,
+      "join_conditions": []
+    },
+    {
+      "table1": "edc_transaction_level",
+      "table2": "partnership_ssot",
+      "frequency": 1048,
+      "join_conditions": []
+    },
+    {
+      "table1": "edc_order_delivery_funnel_opentable",
+      "table2": "user_profile_datamart_v2",
+      "frequency": 1048,
+      "join_conditions": []
+    },
+    {
+      "table1": "location_gmaps_static_opentable",
+      "table2": "user_profile_datamart_v2",
+      "frequency": 1048,
+      "join_conditions": []
+    },
+    {
+      "table1": "kyc_kyb_attempt",
+      "table2": "submissions",
+      "frequency": 1048,
+      "join_conditions": []
+    },
+    {
+      "table1": "edc_order_delivery_funnel_opentable",
+      "table2": "loan_users",
+      "frequency": 1047,
+      "join_conditions": []
+    },
+    {
+      "table1": "edc_order_delivery_funnel_opentable",
+      "table2": "submissions",
+      "frequency": 1047,
+      "join_conditions": []
+    },
+    {
+      "table1": "edc_order_delivery_funnel_opentable",
+      "table2": "partnership_ssot",
+      "frequency": 1045,
+      "join_conditions": []
+    },
+    {
+      "table1": "edc_order_delivery_funnel",
+      "table2": "partnership_ssot",
+      "frequency": 1042,
+      "join_conditions": []
+    },
+    {
+      "table1": "partnership_ssot",
+      "table2": "user_profile_datamart_v2",
+      "frequency": 1042,
+      "join_conditions": []
+    },
+    {
+      "table1": "loan_users",
+      "table2": "partnership_ssot",
+      "frequency": 1041,
+      "join_conditions": []
+    },
+    {
+      "table1": "partnership_ssot",
+      "table2": "submissions",
+      "frequency": 1041,
+      "join_conditions": []
+    },
+    {
+      "table1": "ms_visit_ssot",
+      "table2": "user_profile_datamart_v2",
+      "frequency": 1022,
+      "join_conditions": []
+    },
+    {
+      "table1": "edc_order_delivery_funnel_opentable",
+      "table2": "ms_visit_ssot",
+      "frequency": 1014,
+      "join_conditions": []
+    },
+    {
+      "table1": "kyc_kyb_attempt",
+      "table2": "loan_users",
+      "frequency": 987,
+      "join_conditions": []
+    },
+    {
+      "table1": "loan_users",
+      "table2": "pefindo_scoring_v2",
+      "frequency": 983,
+      "join_conditions": []
     }
   ],
   "table_join_patterns": {
+    "fs_loan_users": [
+      "fs_submissions",
+      "fs_loans"
+    ],
+    "fs_submissions": [
+      "fs_loan_users"
+    ],
+    "ms_merchant_profiling_ssot_opentable": [
+      "retail_visit_ssot_opentable",
+      "retail_transaction_data",
+      "retail_order_delivery_funnel"
+    ],
+    "retail_visit_ssot_opentable": [
+      "ms_merchant_profiling_ssot_opentable",
+      "retail_order_data_opentable"
+    ],
+    "retail_transaction_data": [
+      "ms_merchant_profiling_ssot_opentable",
+      "retail_order_delivery_funnel"
+    ],
+    "retail_order_delivery_funnel": [
+      "retail_transaction_data",
+      "ms_merchant_profiling_ssot_opentable"
+    ],
+    "fs_loans": [
+      "fs_loan_users"
+    ],
     "retail_order_data_opentable": [
       "retail_visit_ssot_opentable"
     ],
+    "loan_users": [
+      "ms_visit_ssot",
+      "edc_order_delivery_funnel",
+      "edc_transaction_level",
+      "submissions",
+      "user_profile_datamart_v2",
+      "location_gmaps_static_opentable",
+      "edc_order_delivery_funnel_opentable",
+      "partnership_ssot",
+      "kyc_kyb_attempt",
+      "pefindo_scoring_v2"
+    ],
+    "ms_visit_ssot": [
+      "loan_users",
+      "edc_order_delivery_funnel",
+      "location_gmaps_static_opentable",
+      "kyc_kyb_attempt",
+      "edc_transaction_level",
+      "submissions",
+      "partnership_ssot",
+      "user_profile_datamart_v2",
+      "edc_order_delivery_funnel_opentable"
+    ],
+    "edc_order_delivery_funnel": [
+      "loan_users",
+      "ms_visit_ssot",
+      "submissions",
+      "location_gmaps_static_opentable",
+      "edc_transaction_level",
+      "user_profile_datamart_v2",
+      "edc_order_delivery_funnel_opentable",
+      "partnership_ssot"
+    ],
     "edc_order_delivery_funnel_opentable": [
+      "edc_transaction_level_opentable",
       "ms_visit_ssot_opentable",
-      "edc_transaction_level_opentable"
+      "location_gmaps_static_opentable",
+      "edc_transaction_level",
+      "edc_order_delivery_funnel",
+      "user_profile_datamart_v2",
+      "loan_users",
+      "submissions",
+      "partnership_ssot",
+      "ms_visit_ssot"
     ],
-    "fs_loans": [
-      "merchant_address",
-      "ms_merchant_profiling_ssot_opentable",
-      "merchant_data"
+    "edc_transaction_level_opentable": [
+      "edc_order_delivery_funnel_opentable"
     ],
-    "fs_loan_users": [
-      "merchant_address",
-      "fs_loans",
-      "ms_merchant_profiling_ssot_opentable",
-      "merchant_data",
-      "fs_submissions"
+    "ms_visit_ssot_opentable": [
+      "edc_order_delivery_funnel_opentable"
     ],
-    "fs_credit_memo": [
-      "merchant_address",
-      "fs_loans",
-      "fs_loan_users",
-      "ms_merchant_profiling_ssot_opentable",
-      "merchant_data"
+    "edc_transaction_level": [
+      "loan_users",
+      "user_profile_datamart_v2",
+      "submissions",
+      "kyc_kyb_attempt",
+      "ms_visit_ssot",
+      "location_gmaps_static_opentable",
+      "edc_order_delivery_funnel",
+      "edc_order_delivery_funnel_opentable",
+      "partnership_ssot"
     ],
-    "merchant_address": [
-      "ms_merchant_profiling_ssot_opentable",
-      "merchant_data"
+    "user_profile_datamart_v2": [
+      "edc_transaction_level",
+      "loan_users",
+      "edc_order_delivery_funnel",
+      "submissions",
+      "edc_order_delivery_funnel_opentable",
+      "location_gmaps_static_opentable",
+      "partnership_ssot",
+      "ms_visit_ssot"
     ],
-    "merchant_data": [
-      "ms_merchant_profiling_ssot_opentable"
+    "submissions": [
+      "edc_transaction_level",
+      "loan_users",
+      "location_gmaps_static_opentable",
+      "ms_visit_ssot",
+      "edc_order_delivery_funnel",
+      "user_profile_datamart_v2",
+      "kyc_kyb_attempt",
+      "edc_order_delivery_funnel_opentable",
+      "partnership_ssot"
     ],
-    "order_payments": [
-      "payments_ssot"
+    "location_gmaps_static_opentable": [
+      "edc_order_delivery_funnel_opentable",
+      "ms_visit_ssot",
+      "partnership_ssot",
+      "submissions",
+      "edc_transaction_level",
+      "loan_users",
+      "edc_order_delivery_funnel",
+      "user_profile_datamart_v2"
+    ],
+    "partnership_ssot": [
+      "location_gmaps_static_opentable",
+      "ms_visit_ssot",
+      "edc_transaction_level",
+      "edc_order_delivery_funnel_opentable",
+      "edc_order_delivery_funnel",
+      "user_profile_datamart_v2",
+      "loan_users",
+      "submissions"
+    ],
+    "kyc_kyb_attempt": [
+      "edc_transaction_level",
+      "ms_visit_ssot",
+      "submissions",
+      "loan_users"
+    ],
+    "pefindo_scoring_v2": [
+      "loan_users"
     ]
   }
 }
