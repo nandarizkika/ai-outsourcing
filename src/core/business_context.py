@@ -34,15 +34,23 @@ class BusinessContextManager:
         return "\n".join(lines)
 
     def get_relationship_context(self) -> str:
-        """Format table relationships for LLM prompt."""
+        """Format table relationships with JOIN keys for LLM prompt."""
         relationships = self.context.get("table_relationships", [])
         if not relationships:
             return ""
 
-        lines = ["## Table Relationships\n"]
+        lines = ["## Table Relationships & JOIN Keys\n"]
         for rel in relationships[:15]:  # Top 15 relationships
             t1, t2 = rel['table1'], rel['table2']
-            lines.append(f"- {t1} connects to {t2}")
+            freq = rel.get('frequency', 0)
+            lines.append(f"- {t1} ↔ {t2} ({freq:,} queries)")
+
+            join_keys = rel.get('join_keys', [])
+            if join_keys:
+                for i, key in enumerate(join_keys[:2], 1):  # Top 2 join keys
+                    key_freq = rel.get('join_key_frequencies', {}).get(key, 0)
+                    lines.append(f"  [{i}] ON {key} ({key_freq:,}x)")
+            lines.append("")
 
         return "\n".join(lines)
 
