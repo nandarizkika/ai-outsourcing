@@ -6,6 +6,7 @@ import uuid
 _logger = logging.getLogger(__name__)
 
 from src.core.llm import LLMRouter
+from src.core.business_context import BusinessContextManager
 from src.core.models import (
     Anomaly, TaskType, Request, Response, ClientConfig, SkillModule,
     ClarificationState, AgentResult, AnalystResult,
@@ -63,6 +64,7 @@ class Orchestrator:
         self._ab_agent = ab_agent
         self._registry = registry
         self._report_agent = report_agent
+        self._business_context = BusinessContextManager()
 
     def _detect_deep_intent(self, request: Request) -> bool:
         system = (
@@ -193,9 +195,11 @@ class Orchestrator:
 
             if sql_agent is not None:
                 _mode = analysis_mode
+                business_context = self._business_context.get_full_context_prompt()
+                enriched_context = f"{context}\n\n{business_context}" if business_context else context
                 sql_result = await asyncio.to_thread(
                     lambda: sql_agent.run(
-                        config.client_id, request.text, context, analysis_mode=_mode
+                        config.client_id, request.text, enriched_context, analysis_mode=_mode
                     )
                 )
                 if sql_result.success:

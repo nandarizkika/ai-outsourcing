@@ -41,7 +41,7 @@ class LLMRouter:
         prompt = f"{system}\n\n{user}"
         response = self._client.models.generate_content(
             model="gemini-3.5-flash",
-            contents=prompt
+            contents=prompt,
         )
         return response.text
 

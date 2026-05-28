@@ -1,0 +1,223 @@
+{
+  "business_glossary": {
+    "GMV": {
+      "name": "Gross Merchandise Value",
+      "definition": "Total transaction value across all orders",
+      "calculation": "SUM(amount_base) from transaction tables",
+      "filters": [
+        "status = 'SUCCESS'",
+        "created_at >= date_range"
+      ]
+    },
+    "active_users": {
+      "name": "Active Users",
+      "definition": "Users with at least one successful transaction",
+      "calculation": "COUNT(DISTINCT user_id)"
+    },
+    "AOV": {
+      "name": "Average Order Value",
+      "definition": "Mean transaction value",
+      "calculation": "AVG(amount_base)"
+    }
+  },
+  "table_relationships": [
+    {
+      "table1": "retail_order_data_opentable",
+      "table2": "retail_visit_ssot_opentable",
+      "join_conditions": [
+        "JOIN found in successful queries"
+      ],
+      "frequency": 0
+    },
+    {
+      "table1": "edc_order_delivery_funnel_opentable",
+      "table2": "ms_visit_ssot_opentable",
+      "join_conditions": [
+        "JOIN found in successful queries"
+      ],
+      "frequency": 0
+    },
+    {
+      "table1": "edc_order_delivery_funnel_opentable",
+      "table2": "edc_transaction_level_opentable",
+      "join_conditions": [
+        "JOIN found in successful queries"
+      ],
+      "frequency": 0
+    },
+    {
+      "table1": "fs_loans",
+      "table2": "merchant_address",
+      "join_conditions": [
+        "JOIN found in successful queries"
+      ],
+      "frequency": 0
+    },
+    {
+      "table1": "fs_loan_users",
+      "table2": "merchant_address",
+      "join_conditions": [
+        "JOIN found in successful queries"
+      ],
+      "frequency": 0
+    },
+    {
+      "table1": "fs_credit_memo",
+      "table2": "merchant_address",
+      "join_conditions": [
+        "JOIN found in successful queries"
+      ],
+      "frequency": 0
+    },
+    {
+      "table1": "merchant_address",
+      "table2": "ms_merchant_profiling_ssot_opentable",
+      "join_conditions": [
+        "JOIN found in successful queries"
+      ],
+      "frequency": 0
+    },
+    {
+      "table1": "merchant_address",
+      "table2": "merchant_data",
+      "join_conditions": [
+        "JOIN found in successful queries"
+      ],
+      "frequency": 0
+    },
+    {
+      "table1": "fs_loan_users",
+      "table2": "fs_loans",
+      "join_conditions": [
+        "JOIN found in successful queries"
+      ],
+      "frequency": 0
+    },
+    {
+      "table1": "fs_credit_memo",
+      "table2": "fs_loans",
+      "join_conditions": [
+        "JOIN found in successful queries"
+      ],
+      "frequency": 0
+    },
+    {
+      "table1": "fs_loans",
+      "table2": "ms_merchant_profiling_ssot_opentable",
+      "join_conditions": [
+        "JOIN found in successful queries"
+      ],
+      "frequency": 0
+    },
+    {
+      "table1": "fs_loans",
+      "table2": "merchant_data",
+      "join_conditions": [
+        "JOIN found in successful queries"
+      ],
+      "frequency": 0
+    },
+    {
+      "table1": "fs_credit_memo",
+      "table2": "fs_loan_users",
+      "join_conditions": [
+        "JOIN found in successful queries"
+      ],
+      "frequency": 0
+    },
+    {
+      "table1": "fs_loan_users",
+      "table2": "ms_merchant_profiling_ssot_opentable",
+      "join_conditions": [
+        "JOIN found in successful queries"
+      ],
+      "frequency": 0
+    },
+    {
+      "table1": "fs_loan_users",
+      "table2": "merchant_data",
+      "join_conditions": [
+        "JOIN found in successful queries"
+      ],
+      "frequency": 0
+    },
+    {
+      "table1": "fs_credit_memo",
+      "table2": "ms_merchant_profiling_ssot_opentable",
+      "join_conditions": [
+        "JOIN found in successful queries"
+      ],
+      "frequency": 0
+    },
+    {
+      "table1": "fs_credit_memo",
+      "table2": "merchant_data",
+      "join_conditions": [
+        "JOIN found in successful queries"
+      ],
+      "frequency": 0
+    },
+    {
+      "table1": "merchant_data",
+      "table2": "ms_merchant_profiling_ssot_opentable",
+      "join_conditions": [
+        "JOIN found in successful queries"
+      ],
+      "frequency": 0
+    },
+    {
+      "table1": "fs_loan_users",
+      "table2": "fs_submissions",
+      "join_conditions": [
+        "JOIN found in successful queries"
+      ],
+      "frequency": 0
+    },
+    {
+      "table1": "order_payments",
+      "table2": "payments_ssot",
+      "join_conditions": [
+        "JOIN found in successful queries"
+      ],
+      "frequency": 0
+    }
+  ],
+  "table_join_patterns": {
+    "retail_order_data_opentable": [
+      "retail_visit_ssot_opentable"
+    ],
+    "edc_order_delivery_funnel_opentable": [
+      "ms_visit_ssot_opentable",
+      "edc_transaction_level_opentable"
+    ],
+    "fs_loans": [
+      "merchant_address",
+      "ms_merchant_profiling_ssot_opentable",
+      "merchant_data"
+    ],
+    "fs_loan_users": [
+      "merchant_address",
+      "fs_loans",
+      "ms_merchant_profiling_ssot_opentable",
+      "merchant_data",
+      "fs_submissions"
+    ],
+    "fs_credit_memo": [
+      "merchant_address",
+      "fs_loans",
+      "fs_loan_users",
+      "ms_merchant_profiling_ssot_opentable",
+      "merchant_data"
+    ],
+    "merchant_address": [
+      "ms_merchant_profiling_ssot_opentable",
+      "merchant_data"
+    ],
+    "merchant_data": [
+      "ms_merchant_profiling_ssot_opentable"
+    ],
+    "order_payments": [
+      "payments_ssot"
+    ]
+  }
+}
