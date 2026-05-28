@@ -297,15 +297,25 @@
       "table1": "ms_visit_ssot",
       "table2": "partnership_ssot",
       "frequency": 1082,
-      "join_keys": [],
-      "note": "Needs manual validation"
+      "join_keys": [
+        "ms_visit_ssot.phoneNumber = partnership_ssot.bw_user_id"
+      ],
+      "note": "Needs manual validation",
+      "join_key_frequencies": {
+        "ms_visit_ssot.phoneNumber = partnership_ssot.bw_user_id": 1082
+      }
     },
     {
       "table1": "edc_order_delivery_funnel",
       "table2": "submissions",
       "frequency": 1075,
-      "join_keys": [],
-      "note": "Needs manual validation"
+      "join_keys": [
+        "edc_order_delivery_funnel.user_id = submissions.user_id"
+      ],
+      "note": "Needs manual validation",
+      "join_key_frequencies": {
+        "edc_order_delivery_funnel.user_id = submissions.user_id": 1075
+      }
     },
     {
       "table1": "loan_users",
@@ -318,50 +328,85 @@
       "table1": "edc_order_delivery_funnel",
       "table2": "location_gmaps_static_opentable",
       "frequency": 1061,
-      "join_keys": [],
-      "note": "Needs manual validation"
+      "join_keys": [
+        "edc_order_delivery_funnel.bw_user_id = location_gmaps_static_opentable.phone_number"
+      ],
+      "note": "Needs manual validation",
+      "join_key_frequencies": {
+        "edc_order_delivery_funnel.bw_user_id = location_gmaps_static_opentable.phone_number": 1061
+      }
     },
     {
       "table1": "edc_order_delivery_funnel",
       "table2": "edc_transaction_level",
       "frequency": 1061,
-      "join_keys": [],
-      "note": "Needs manual validation"
+      "join_keys": [
+        "edc_order_delivery_funnel.serial_number = edc_transaction_level.serial_number"
+      ],
+      "note": "Needs manual validation",
+      "join_key_frequencies": {
+        "edc_order_delivery_funnel.serial_number = edc_transaction_level.serial_number": 1061
+      }
     },
     {
       "table1": "edc_order_delivery_funnel_opentable",
       "table2": "edc_transaction_level",
       "frequency": 1059,
-      "join_keys": [],
-      "note": "Needs manual validation"
+      "join_keys": [
+        "edc_order_delivery_funnel_opentable.serial_number = edc_transaction_level.serial_number"
+      ],
+      "note": "Needs manual validation",
+      "join_key_frequencies": {
+        "edc_order_delivery_funnel_opentable.serial_number = edc_transaction_level.serial_number": 1059
+      }
     },
     {
       "table1": "edc_order_delivery_funnel",
       "table2": "user_profile_datamart_v2",
       "frequency": 1057,
-      "join_keys": [],
-      "note": "Needs manual validation"
+      "join_keys": [
+        "edc_order_delivery_funnel.bw_user_id = user_profile_datamart_v2.bw_user_id"
+      ],
+      "note": "Needs manual validation",
+      "join_key_frequencies": {
+        "edc_order_delivery_funnel.bw_user_id = user_profile_datamart_v2.bw_user_id": 1057
+      }
     },
     {
       "table1": "submissions",
       "table2": "user_profile_datamart_v2",
       "frequency": 1052,
-      "join_keys": [],
-      "note": "Needs manual validation"
+      "join_keys": [
+        "submissions.user_id = user_profile_datamart_v2.bw_user_id"
+      ],
+      "note": "Needs manual validation",
+      "join_key_frequencies": {
+        "submissions.user_id = user_profile_datamart_v2.bw_user_id": 1052
+      }
     },
     {
       "table1": "edc_order_delivery_funnel",
       "table2": "edc_order_delivery_funnel_opentable",
       "frequency": 1051,
-      "join_keys": [],
-      "note": "Needs manual validation"
+      "join_keys": [
+        "edc_order_delivery_funnel.serial_number = edc_order_delivery_funnel_opentable.serial_number"
+      ],
+      "note": "Needs manual validation",
+      "join_key_frequencies": {
+        "edc_order_delivery_funnel.serial_number = edc_order_delivery_funnel_opentable.serial_number": 1051
+      }
     },
     {
       "table1": "edc_transaction_level",
       "table2": "partnership_ssot",
       "frequency": 1048,
-      "join_keys": [],
-      "note": "Needs manual validation"
+      "join_keys": [
+        "edc_transaction_level.terminal_id = partnership_ssot.tid"
+      ],
+      "note": "Needs manual validation",
+      "join_key_frequencies": {
+        "edc_transaction_level.terminal_id = partnership_ssot.tid": 1048
+      }
     },
     {
       "table1": "edc_order_delivery_funnel_opentable",
