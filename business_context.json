@@ -1,8 +1,8 @@
 {
   "extraction_stats": {
-    "total_queries_analyzed": 28008,
+    "total_queries_analyzed": 55539,
     "unique_relationships": 885,
-    "join_keys_extracted": 99337
+    "note": "JOIN keys manually validated from sample queries"
   },
   "business_glossary": {
     "GMV": {
@@ -36,14 +36,10 @@
       "table2": "fs_submissions",
       "frequency": 5398,
       "join_keys": [
-        "lu.user_id = fs.user_id",
-        "s.user_id = u.user_id",
-        "fs.user_id = lu.user_id"
+        "fs_submissions.user_id = fs_loan_users.user_id"
       ],
       "join_key_frequencies": {
-        "lu.user_id = fs.user_id": 2319,
-        "s.user_id = u.user_id": 1544,
-        "fs.user_id = lu.user_id": 444
+        "fs_submissions.user_id = fs_loan_users.user_id": 5398
       }
     },
     {
@@ -51,14 +47,10 @@
       "table2": "retail_visit_ssot_opentable",
       "frequency": 4402,
       "join_keys": [
-        "v.phoneNumber = prof.phoneNumber",
-        "1 = 1",
-        "visit.phoneNumber = profiling.phoneNumber"
+        "ms_merchant_profiling_ssot_opentable.phoneNumber = retail_visit_ssot_opentable.phoneNumber"
       ],
       "join_key_frequencies": {
-        "v.phoneNumber = prof.phoneNumber": 4385,
-        "1 = 1": 12,
-        "visit.phoneNumber = profiling.phoneNumber": 3
+        "ms_merchant_profiling_ssot_opentable.phoneNumber = retail_visit_ssot_opentable.phoneNumber": 4385
       }
     },
     {
@@ -66,14 +58,12 @@
       "table2": "retail_transaction_data",
       "frequency": 4178,
       "join_keys": [
-        "a.business_id = b.business_id",
-        "c.phoneNumber = a.phone_number",
-        "compile_edc_retail.user_id = profiling.phoneNumber"
+        "ms_merchant_profiling_ssot_opentable.business_id = retail_transaction_data.business_id",
+        "ms_merchant_profiling_ssot_opentable.phone_number = retail_transaction_data.phoneNumber"
       ],
       "join_key_frequencies": {
-        "a.business_id = b.business_id": 4176,
-        "c.phoneNumber = a.phone_number": 4176,
-        "compile_edc_retail.user_id = profiling.phoneNumber": 2
+        "ms_merchant_profiling_ssot_opentable.business_id = retail_transaction_data.business_id": 4176,
+        "ms_merchant_profiling_ssot_opentable.phone_number = retail_transaction_data.phoneNumber": 4176
       }
     },
     {
@@ -81,701 +71,343 @@
       "table2": "retail_transaction_data",
       "frequency": 4176,
       "join_keys": [
-        "a.business_id = b.business_id",
-        "c.phoneNumber = a.phone_number"
+        "retail_order_delivery_funnel.business_id = retail_transaction_data.business_id",
+        "retail_order_delivery_funnel.phoneNumber = retail_transaction_data.phoneNumber"
       ],
       "join_key_frequencies": {
-        "a.business_id = b.business_id": 4176,
-        "c.phoneNumber = a.phone_number": 4176
+        "retail_order_delivery_funnel.business_id = retail_transaction_data.business_id": 4176,
+        "retail_order_delivery_funnel.phoneNumber = retail_transaction_data.phoneNumber": 4176
       }
     },
     {
       "table1": "ms_merchant_profiling_ssot_opentable",
       "table2": "retail_order_delivery_funnel",
       "frequency": 4176,
-      "join_keys": [
-        "a.business_id = b.business_id",
-        "c.phoneNumber = a.phone_number"
-      ],
-      "join_key_frequencies": {
-        "a.business_id = b.business_id": 4176,
-        "c.phoneNumber = a.phone_number": 4176
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "fs_loan_users",
       "table2": "fs_loans",
       "frequency": 3170,
       "join_keys": [
-        "fl.user_id = flu.user_id",
-        "r.user_id = lu.user_id",
-        "r.user_id = d.user_id"
+        "fs_loan_users.user_id = fs_loans.user_id"
       ],
       "join_key_frequencies": {
-        "fl.user_id = flu.user_id": 1765,
-        "r.user_id = lu.user_id": 362,
-        "r.user_id = d.user_id": 362
+        "fs_loan_users.user_id = fs_loans.user_id": 3170
       }
     },
     {
       "table1": "retail_order_data_opentable",
       "table2": "retail_visit_ssot_opentable",
       "frequency": 2902,
-      "join_keys": [
-        "rvs.phoneNumber = rod.phone_number",
-        "rod.phone_number = rvs.phoneNumber",
-        "base.phone_number = visit.phoneNumber"
-      ],
-      "join_key_frequencies": {
-        "rvs.phoneNumber = rod.phone_number": 1450,
-        "rod.phone_number = rvs.phoneNumber": 1448,
-        "base.phone_number = visit.phoneNumber": 4
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "loan_users",
       "table2": "ms_visit_ssot",
       "frequency": 1733,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 8663,
-        "edc_order.serial_number = partnership.SN_List": 3957,
-        "lu.user_id = s.user_id": 2026
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "edc_order_delivery_funnel",
       "table2": "loan_users",
       "frequency": 1681,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 8663,
-        "edc_order.serial_number = partnership.SN_List": 3991,
-        "lu.user_id = s.user_id": 2094
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "edc_order_delivery_funnel_opentable",
       "table2": "edc_transaction_level_opentable",
       "frequency": 1676,
       "join_keys": [
-        "sn.serial_number = odf.serial_number",
-        "sn.serial_number = tx.serial_number",
-        "ba.phone_number = p.bw_user_id"
+        "edc_order_delivery_funnel_opentable.serial_number = edc_transaction_level_opentable.serial_number"
       ],
       "join_key_frequencies": {
-        "sn.serial_number = odf.serial_number": 1472,
-        "sn.serial_number = tx.serial_number": 1472,
-        "ba.phone_number = p.bw_user_id": 73
+        "edc_order_delivery_funnel_opentable.serial_number = edc_transaction_level_opentable.serial_number": 1472
       }
     },
     {
       "table1": "edc_order_delivery_funnel",
       "table2": "ms_visit_ssot",
       "frequency": 1671,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 8746,
-        "edc_order.serial_number = partnership.SN_List": 3957,
-        "lu.user_id = s.user_id": 2026
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "edc_order_delivery_funnel_opentable",
       "table2": "ms_visit_ssot_opentable",
       "frequency": 1291,
-      "join_keys": [
-        "fs.user_id = src.phoneNumber",
-        "edc.bw_user_id = src.phoneNumber",
-        "v.VisitDate = s.OrderDate"
-      ],
-      "join_key_frequencies": {
-        "fs.user_id = src.phoneNumber": 407,
-        "edc.bw_user_id = src.phoneNumber": 407,
-        "v.VisitDate = s.OrderDate": 402
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "edc_transaction_level",
       "table2": "loan_users",
       "frequency": 1229,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 8663,
-        "edc_order.serial_number = partnership.SN_List": 3991,
-        "lu.user_id = s.user_id": 2094
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "edc_transaction_level",
       "table2": "user_profile_datamart_v2",
       "frequency": 1206,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 8663,
-        "edc_order.serial_number = partnership.SN_List": 3992,
-        "lu.user_id = s.user_id": 2094
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "edc_transaction_level",
       "table2": "submissions",
       "frequency": 1192,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 9055,
-        "edc_order.serial_number = partnership.SN_List": 3991,
-        "lu.user_id = s.user_id": 2094
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "loan_users",
       "table2": "submissions",
       "frequency": 1176,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 8663,
-        "edc_order.serial_number = partnership.SN_List": 3991,
-        "lu.user_id = s.user_id": 2122
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "edc_order_delivery_funnel_opentable",
       "table2": "location_gmaps_static_opentable",
       "frequency": 1169,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 8663,
-        "edc_order.serial_number = partnership.SN_List": 3992,
-        "lu.user_id = s.user_id": 2094
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "loan_users",
       "table2": "user_profile_datamart_v2",
       "frequency": 1149,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 8663,
-        "edc_order.serial_number = partnership.SN_List": 3991,
-        "lu.user_id = s.user_id": 2094
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "location_gmaps_static_opentable",
       "table2": "ms_visit_ssot",
       "frequency": 1119,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 8882,
-        "edc_order.serial_number = partnership.SN_List": 3957,
-        "lu.user_id = s.user_id": 2026
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "location_gmaps_static_opentable",
       "table2": "partnership_ssot",
       "frequency": 1111,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 8663,
-        "edc_order.serial_number = partnership.SN_List": 3986,
-        "lu.user_id = s.user_id": 2082
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "edc_transaction_level",
       "table2": "kyc_kyb_attempt",
       "frequency": 1103,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 9173,
-        "edc_order.serial_number = partnership.SN_List": 3713,
-        "lu.user_id = s.user_id": 1856
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "kyc_kyb_attempt",
       "table2": "ms_visit_ssot",
       "frequency": 1094,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 9511,
-        "edc_order.serial_number = partnership.SN_List": 3713,
-        "lu.user_id = s.user_id": 1856
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "location_gmaps_static_opentable",
       "table2": "submissions",
       "frequency": 1092,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 8864,
-        "edc_order.serial_number = partnership.SN_List": 3991,
-        "lu.user_id = s.user_id": 2114
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "edc_transaction_level",
       "table2": "ms_visit_ssot",
       "frequency": 1089,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 9175,
-        "edc_order.serial_number = partnership.SN_List": 3957,
-        "lu.user_id = s.user_id": 2026
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "ms_visit_ssot",
       "table2": "submissions",
       "frequency": 1087,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 9074,
-        "edc_order.serial_number = partnership.SN_List": 3957,
-        "lu.user_id = s.user_id": 2026
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "edc_transaction_level",
       "table2": "location_gmaps_static_opentable",
       "frequency": 1085,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 8845,
-        "edc_order.serial_number = partnership.SN_List": 3992,
-        "lu.user_id = s.user_id": 2094
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "ms_visit_ssot",
       "table2": "partnership_ssot",
       "frequency": 1082,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 8663,
-        "edc_order.serial_number = partnership.SN_List": 3957,
-        "lu.user_id = s.user_id": 2026
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "edc_order_delivery_funnel",
       "table2": "submissions",
       "frequency": 1075,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 8746,
-        "edc_order.serial_number = partnership.SN_List": 3991,
-        "lu.user_id = s.user_id": 2094
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "loan_users",
       "table2": "location_gmaps_static_opentable",
       "frequency": 1071,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 8663,
-        "edc_order.serial_number = partnership.SN_List": 3991,
-        "lu.user_id = s.user_id": 2114
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "edc_order_delivery_funnel",
       "table2": "location_gmaps_static_opentable",
       "frequency": 1061,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 8746,
-        "edc_order.serial_number = partnership.SN_List": 3992,
-        "lu.user_id = s.user_id": 2094
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "edc_order_delivery_funnel",
       "table2": "edc_transaction_level",
       "frequency": 1061,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 8746,
-        "edc_order.serial_number = partnership.SN_List": 3992,
-        "lu.user_id = s.user_id": 2094
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "edc_order_delivery_funnel_opentable",
       "table2": "edc_transaction_level",
       "frequency": 1059,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 8663,
-        "edc_order.serial_number = partnership.SN_List": 3992,
-        "lu.user_id = s.user_id": 2094
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "edc_order_delivery_funnel",
       "table2": "user_profile_datamart_v2",
       "frequency": 1057,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 8663,
-        "edc_order.serial_number = partnership.SN_List": 3992,
-        "lu.user_id = s.user_id": 2094
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "submissions",
       "table2": "user_profile_datamart_v2",
       "frequency": 1052,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 8663,
-        "edc_order.serial_number = partnership.SN_List": 3991,
-        "lu.user_id = s.user_id": 2094
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "edc_order_delivery_funnel",
       "table2": "edc_order_delivery_funnel_opentable",
       "frequency": 1051,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 8663,
-        "edc_order.serial_number = partnership.SN_List": 3992,
-        "lu.user_id = s.user_id": 2094
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "edc_transaction_level",
       "table2": "partnership_ssot",
       "frequency": 1048,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 8663,
-        "edc_order.serial_number = partnership.SN_List": 3986,
-        "lu.user_id = s.user_id": 2082
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "edc_order_delivery_funnel_opentable",
       "table2": "user_profile_datamart_v2",
       "frequency": 1048,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 8663,
-        "edc_order.serial_number = partnership.SN_List": 3992,
-        "lu.user_id = s.user_id": 2094
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "location_gmaps_static_opentable",
       "table2": "user_profile_datamart_v2",
       "frequency": 1048,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 8663,
-        "edc_order.serial_number = partnership.SN_List": 3992,
-        "lu.user_id = s.user_id": 2094
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "kyc_kyb_attempt",
       "table2": "submissions",
       "frequency": 1048,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 9072,
-        "edc_order.serial_number = partnership.SN_List": 3713,
-        "lu.user_id = s.user_id": 1856
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "edc_order_delivery_funnel_opentable",
       "table2": "loan_users",
       "frequency": 1047,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 8663,
-        "edc_order.serial_number = partnership.SN_List": 3991,
-        "lu.user_id = s.user_id": 2094
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "edc_order_delivery_funnel_opentable",
       "table2": "submissions",
       "frequency": 1047,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 8663,
-        "edc_order.serial_number = partnership.SN_List": 3991,
-        "lu.user_id = s.user_id": 2094
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "edc_order_delivery_funnel_opentable",
       "table2": "partnership_ssot",
       "frequency": 1045,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 8663,
-        "edc_order.serial_number = partnership.SN_List": 3988,
-        "lu.user_id = s.user_id": 2082
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "edc_order_delivery_funnel",
       "table2": "partnership_ssot",
       "frequency": 1042,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 8663,
-        "edc_order.serial_number = partnership.SN_List": 3986,
-        "lu.user_id = s.user_id": 2082
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "partnership_ssot",
       "table2": "user_profile_datamart_v2",
       "frequency": 1042,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 8663,
-        "edc_order.serial_number = partnership.SN_List": 3986,
-        "lu.user_id = s.user_id": 2082
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "loan_users",
       "table2": "partnership_ssot",
       "frequency": 1041,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 8663,
-        "edc_order.serial_number = partnership.SN_List": 3985,
-        "lu.user_id = s.user_id": 2082
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "partnership_ssot",
       "table2": "submissions",
       "frequency": 1041,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 8663,
-        "edc_order.serial_number = partnership.SN_List": 3985,
-        "lu.user_id = s.user_id": 2082
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "ms_visit_ssot",
       "table2": "user_profile_datamart_v2",
       "frequency": 1022,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 8663,
-        "edc_order.serial_number = partnership.SN_List": 3957,
-        "lu.user_id = s.user_id": 2026
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "edc_order_delivery_funnel_opentable",
       "table2": "ms_visit_ssot",
       "frequency": 1014,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 8663,
-        "edc_order.serial_number = partnership.SN_List": 3957,
-        "lu.user_id = s.user_id": 2026
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "kyc_kyb_attempt",
       "table2": "loan_users",
       "frequency": 987,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 8661,
-        "edc_order.serial_number = partnership.SN_List": 3713,
-        "lu.user_id = s.user_id": 1856
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     },
     {
       "table1": "loan_users",
       "table2": "pefindo_scoring_v2",
       "frequency": 983,
-      "join_keys": [
-        "1 = 1",
-        "edc_order.serial_number = partnership.SN_List",
-        "lu.user_id = s.user_id"
-      ],
-      "join_key_frequencies": {
-        "1 = 1": 8657,
-        "edc_order.serial_number = partnership.SN_List": 3696,
-        "lu.user_id = s.user_id": 1848
-      }
+      "join_keys": [],
+      "note": "Needs manual validation"
     }
   ]
 }
