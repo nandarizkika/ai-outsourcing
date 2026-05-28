@@ -83,8 +83,15 @@
       "table1": "ms_merchant_profiling_ssot_opentable",
       "table2": "retail_order_delivery_funnel",
       "frequency": 4176,
-      "join_keys": [],
-      "note": "Needs manual validation"
+      "join_keys": [
+        "ms_merchant_profiling_ssot_opentable.business_id = retail_order_delivery_funnel.business_id",
+        "ms_merchant_profiling_ssot_opentable.phoneNumber = retail_order_delivery_funnel.phoneNumber"
+      ],
+      "note": "Needs manual validation",
+      "join_key_frequencies": {
+        "ms_merchant_profiling_ssot_opentable.business_id = retail_order_delivery_funnel.business_id": 4176,
+        "ms_merchant_profiling_ssot_opentable.phoneNumber = retail_order_delivery_funnel.phoneNumber": 4176
+      }
     },
     {
       "table1": "fs_loan_users",
@@ -101,22 +108,37 @@
       "table1": "retail_order_data_opentable",
       "table2": "retail_visit_ssot_opentable",
       "frequency": 2902,
-      "join_keys": [],
-      "note": "Needs manual validation"
+      "join_keys": [
+        "retail_order_data_opentable.phone_number = retail_visit_ssot_opentable.phoneNumber"
+      ],
+      "note": "Needs manual validation",
+      "join_key_frequencies": {
+        "retail_order_data_opentable.phone_number = retail_visit_ssot_opentable.phoneNumber": 2902
+      }
     },
     {
       "table1": "loan_users",
       "table2": "ms_visit_ssot",
       "frequency": 1733,
-      "join_keys": [],
-      "note": "Needs manual validation"
+      "join_keys": [
+        "loan_users.user_id = ms_visit_ssot.phoneNumber"
+      ],
+      "note": "Needs manual validation",
+      "join_key_frequencies": {
+        "loan_users.user_id = ms_visit_ssot.phoneNumber": 1733
+      }
     },
     {
       "table1": "edc_order_delivery_funnel",
       "table2": "loan_users",
       "frequency": 1681,
-      "join_keys": [],
-      "note": "Needs manual validation"
+      "join_keys": [
+        "edc_order_delivery_funnel.bw_user_id = loan_users.user_id"
+      ],
+      "note": "Needs manual validation",
+      "join_key_frequencies": {
+        "edc_order_delivery_funnel.bw_user_id = loan_users.user_id": 1681
+      }
     },
     {
       "table1": "edc_order_delivery_funnel_opentable",
@@ -133,43 +155,73 @@
       "table1": "edc_order_delivery_funnel",
       "table2": "ms_visit_ssot",
       "frequency": 1671,
-      "join_keys": [],
-      "note": "Needs manual validation"
+      "join_keys": [
+        "edc_order_delivery_funnel.bw_user_id = ms_visit_ssot.phoneNumber"
+      ],
+      "note": "Needs manual validation",
+      "join_key_frequencies": {
+        "edc_order_delivery_funnel.bw_user_id = ms_visit_ssot.phoneNumber": 1671
+      }
     },
     {
       "table1": "edc_order_delivery_funnel_opentable",
       "table2": "ms_visit_ssot_opentable",
       "frequency": 1291,
-      "join_keys": [],
-      "note": "Needs manual validation"
+      "join_keys": [
+        "edc_order_delivery_funnel_opentable.bw_user_id = ms_visit_ssot_opentable.phoneNumber"
+      ],
+      "note": "Needs manual validation",
+      "join_key_frequencies": {
+        "edc_order_delivery_funnel_opentable.bw_user_id = ms_visit_ssot_opentable.phoneNumber": 1291
+      }
     },
     {
       "table1": "edc_transaction_level",
       "table2": "loan_users",
       "frequency": 1229,
-      "join_keys": [],
-      "note": "Needs manual validation"
+      "join_keys": [
+        "edc_transaction_level.bw_user_id = loan_users.user_id"
+      ],
+      "note": "Needs manual validation",
+      "join_key_frequencies": {
+        "edc_transaction_level.bw_user_id = loan_users.user_id": 1229
+      }
     },
     {
       "table1": "edc_transaction_level",
       "table2": "user_profile_datamart_v2",
       "frequency": 1206,
-      "join_keys": [],
-      "note": "Needs manual validation"
+      "join_keys": [
+        "edc_transaction_level.bw_user_id = user_profile_datamart_v2.bw_user_id"
+      ],
+      "note": "Needs manual validation",
+      "join_key_frequencies": {
+        "edc_transaction_level.bw_user_id = user_profile_datamart_v2.bw_user_id": 1206
+      }
     },
     {
       "table1": "edc_transaction_level",
       "table2": "submissions",
       "frequency": 1192,
-      "join_keys": [],
-      "note": "Needs manual validation"
+      "join_keys": [
+        "edc_transaction_level.user_id = submissions.user_id"
+      ],
+      "note": "Needs manual validation",
+      "join_key_frequencies": {
+        "edc_transaction_level.user_id = submissions.user_id": 1192
+      }
     },
     {
       "table1": "loan_users",
       "table2": "submissions",
       "frequency": 1176,
-      "join_keys": [],
-      "note": "Needs manual validation"
+      "join_keys": [
+        "loan_users.user_id = submissions.user_id"
+      ],
+      "note": "Needs manual validation",
+      "join_key_frequencies": {
+        "loan_users.user_id = submissions.user_id": 1176
+      }
     },
     {
       "table1": "edc_order_delivery_funnel_opentable",
