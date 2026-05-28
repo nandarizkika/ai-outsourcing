@@ -86,6 +86,9 @@ class RegistryAdapter(dict):
         cfg = registry.get(key)
         return cfg if cfg is not None else default
 
+    def keys(self):
+        return [c.client_id for c in registry.all()]
+
 
 client_configs = RegistryAdapter()
 
