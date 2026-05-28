@@ -5,29 +5,110 @@
     "note": "JOIN keys manually validated from sample queries"
   },
   "business_glossary": {
-    "GMV": {
-      "name": "Gross Merchandise Value",
-      "definition": "Total transaction value across all orders",
-      "calculation": "SUM(amount_base)",
-      "filters": [
-        "status = 'SUCCESS'"
-      ]
-    },
-    "active_users": {
-      "name": "Active Users",
-      "definition": "Users with at least one successful transaction",
+    "unique_users": {
+      "name": "Unique/Active Users",
       "calculation": "COUNT(DISTINCT user_id)",
-      "filters": [
-        "status = 'SUCCESS'"
-      ]
+      "common_filters": [
+        "DATE >= recent_date",
+        "status = 'SUCCESS'",
+        "ACTIVITY_TYPE"
+      ],
+      "tables": [
+        "fs_loan_users",
+        "user_profile_datamart_v2",
+        "ms_visit_ssot"
+      ],
+      "frequency": "781+ queries"
     },
-    "AOV": {
-      "name": "Average Order Value",
-      "definition": "Mean transaction value",
-      "calculation": "AVG(amount_base)",
-      "filters": [
-        "status = 'SUCCESS'"
-      ]
+    "gross_revenue": {
+      "name": "Gross Revenue IDR",
+      "calculation": "SUM(GROSS_REVENUE_IDR)",
+      "common_filters": [
+        "PAID_DATE >= date",
+        "TRANSACTION_DATE >= date"
+      ],
+      "tables": [
+        "retail_transaction_data",
+        "edc_transaction_level"
+      ],
+      "frequency": "235+ queries"
+    },
+    "visit_metrics": {
+      "name": "Visit Duration & Count",
+      "calculation": "COUNT(DISTINCT VISIT_ID), AVG(VISIT_DURATION_MINUTES)",
+      "common_filters": [
+        "VISITDATE >= date"
+      ],
+      "tables": [
+        "retail_visit_ssot_opentable",
+        "ms_visit_ssot"
+      ],
+      "frequency": "97+ queries"
+    },
+    "order_metrics": {
+      "name": "Order Count & Transactions",
+      "calculation": "COUNT(DISTINCT ORDER_ID), COUNT(DISTINCT TRANSACTION_ID)",
+      "common_filters": [
+        "ORDER_DATE >= date",
+        "PAID_DATE"
+      ],
+      "tables": [
+        "retail_order_data_opentable",
+        "retail_transaction_data"
+      ],
+      "frequency": "339+ queries"
+    },
+    "processing_time": {
+      "name": "Processing/Journey Time",
+      "calculation": "AVG(TIMESTAMP_DIFF(SUBMITTED_AT, CREATED_AT, SECOND))",
+      "common_filters": [
+        "ACTIVITY_TYPE",
+        "STATUS"
+      ],
+      "tables": [
+        "fs_submissions",
+        "edc_order_delivery_funnel"
+      ],
+      "frequency": "154+ queries"
+    },
+    "success_conversion": {
+      "name": "Success/Conversion Rate",
+      "calculation": "COUNT(DISTINCT CASE WHEN CATEGORY = 'SUCCESS')",
+      "common_filters": [
+        "CATEGORY",
+        "STATUS"
+      ],
+      "tables": [
+        "edc_transaction_level",
+        "retail_transaction_data"
+      ],
+      "frequency": "82+ queries"
+    },
+    "voucher_usage": {
+      "name": "Voucher/Promo Usage",
+      "calculation": "COUNT(DISTINCT ORDER_ID) WHERE VOUCHER_CODE IS NOT NULL",
+      "common_filters": [
+        "VOUCHER_CODE",
+        "VISITDATE"
+      ],
+      "tables": [
+        "retail_order_data_opentable",
+        "ms_visit_ssot"
+      ],
+      "frequency": "52+ queries"
+    },
+    "active_devices": {
+      "name": "Active Devices",
+      "calculation": "COUNT(DISTINCT DEVICE_ID) - COALESCE(ACTIVE_DEVICES, 0)",
+      "common_filters": [
+        "DEVICE_FLAG",
+        "CHANNEL"
+      ],
+      "tables": [
+        "edc_transaction_level",
+        "edc_all_transaction_success_failed_opentable"
+      ],
+      "frequency": "414+ queries"
     }
   },
   "table_relationships": [
