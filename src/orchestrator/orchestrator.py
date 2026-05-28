@@ -140,6 +140,7 @@ class Orchestrator:
 
         # Stage 1 — Plan
         plan = await asyncio.to_thread(self._plan, request, context)
+        _logger.info(f"[ORCHESTRATOR] Plan decision: {plan}")
         charts: list[bytes] = []
         sql_data: dict | None = None
         sql_queries: list[str] = []
@@ -181,6 +182,7 @@ class Orchestrator:
 
         # SQL — sequential data fetch
         if plan.get("sql") and SkillModule.SQL_QUERYING in config.enabled_skills:
+            _logger.info(f"[ORCHESTRATOR] SQL capability enabled, fetching data...")
             analysis_mode = None
             if plan.get("funnel") and SkillModule.FUNNEL_ANALYSIS in config.enabled_skills:
                 analysis_mode = "funnel"
@@ -197,6 +199,7 @@ class Orchestrator:
                 _mode = analysis_mode
                 business_context = self._business_context.get_full_context_prompt()
                 enriched_context = f"{context}\n\n{business_context}" if business_context else context
+                _logger.info(f"[ORCHESTRATOR] Executing SQL agent with mode={_mode}")
                 sql_result = await asyncio.to_thread(
                     lambda: sql_agent.run(
                         config.client_id, request.text, enriched_context, analysis_mode=_mode
@@ -205,7 +208,11 @@ class Orchestrator:
                 if sql_result.success:
                     sql_data = sql_result.data
                     if sql_data and sql_data.get("query"):
+                        _logger.info(f"[ORCHESTRATOR] SQL Query: {sql_data.get('query')}")
+                        _logger.info(f"[ORCHESTRATOR] SQL Rows returned: {len(sql_data.get('rows', []))}")
                         sql_queries.append(sql_data["query"])
+                else:
+                    _logger.warning(f"[ORCHESTRATOR] SQL execution failed: {sql_result.error}")
 
         # Stage 3 — Analysis agents (parallel)
         if sql_data:
