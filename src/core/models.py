@@ -162,6 +162,8 @@ class Response(BaseModel):
     anomalies: list[Anomaly] = []
     report_markdown: Optional[str] = None
     report_html: Optional[str] = None
+    selected_deliverable: Optional[DeliverableType] = None
+    sql_data: Optional[dict] = None
 
 
 class StepRecord(BaseModel):

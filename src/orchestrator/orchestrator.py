@@ -434,6 +434,8 @@ class Orchestrator:
             anomalies=[Anomaly(**a) for a in anomalies],
             report_markdown=report_markdown,
             report_html=report_html,
+            selected_deliverable=clarification_state.selected_deliverable if clarification_state else None,
+            sql_data=sql_data,
         )
 
         if self._memory_logger is not None:
