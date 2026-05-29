@@ -3,10 +3,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    anthropic_api_key: str
-    openai_api_key: str
-    slack_bot_token: str
-    slack_signing_secret: str
+    llm_provider: str = "gemini"
+    anthropic_api_key: str = ""
+    openai_api_key: str = ""
+    gemini_api_key: str = ""
+    slack_bot_token: str = ""
+    slack_signing_secret: str = ""
     chromadb_persist_dir: str = ".chromadb"
     clients_file: str = "clients.json"
     api_key: str = ""

@@ -1,5 +1,6 @@
 # main.py
 from fastapi import FastAPI, Request, Depends, Header
+from datetime import datetime
 from src.core.config import Settings
 from src.core.llm import LLMRouter
 from src.knowledge.vector_store import VectorStore
@@ -40,8 +41,10 @@ from src.middleware.logging import RequestLoggingMiddleware
 settings = Settings()
 verify_api_key = make_verify_api_key(settings)
 llm = LLMRouter(
-    anthropic_api_key=settings.anthropic_api_key,
+    provider=settings.llm_provider,
+    gemini_api_key=settings.gemini_api_key,
     openai_api_key=settings.openai_api_key,
+    anthropic_api_key=settings.anthropic_api_key,
 )
 store = VectorStore(
     persist_dir=settings.chromadb_persist_dir,
@@ -82,6 +85,9 @@ class RegistryAdapter(dict):
     def get(self, key, default=None):
         cfg = registry.get(key)
         return cfg if cfg is not None else default
+
+    def keys(self):
+        return [c.client_id for c in registry.all()]
 
 
 client_configs = RegistryAdapter()
@@ -215,15 +221,74 @@ async def analyze(request: StarletteRequest, body: AnalyzeBody, x_client_id: str
     config = registry.get(body.request.client_id)
     if config is None:
         raise HTTPException(status_code=404, detail="Client not found")
-    result = await orchestrator.process(body.request, config, body.clarification_state)
-    if hasattr(result, "model_dump"):
-        return result.model_dump()
-    return {"result": str(result)}
+    try:
+        result = await orchestrator.process(body.request, config, body.clarification_state)
+        if hasattr(result, "model_dump"):
+            return result.model_dump()
+        return {"result": str(result)}
+    except Exception as e:
+        import traceback
+        print(f"ERROR in analyze: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
 
 @app.post("/slack/events")
 async def slack_events(req: Request):
-    return await slack.get_handler().handle(req)
+    import logging
+    import json
+    logger = logging.getLogger(__name__)
+
+    # Log raw request
+    body = await req.body()
+
+    try:
+        event_data = json.loads(body)
+        event_type = event_data.get('event', {}).get('type', 'unknown') if event_data.get('type') == 'event_callback' else event_data.get('type', 'unknown')
+    except:
+        event_type = 'parse_error'
+
+    logger.info(f"[Slack] REQUEST: {len(body)} bytes, event_type={event_type}")
+
+    # Always write to file - this is our diagnostic tool
+    with open("/tmp/slack_raw_events.log", "a") as f:
+        f.write(f"\n{'='*60}\n")
+        f.write(f"Timestamp: {datetime.utcnow().isoformat()}\n")
+        f.write(f"Event Type: {event_type}\n")
+        f.write(f"Body ({len(body)} bytes):\n")
+        f.write(body.decode('utf-8', errors='ignore')[:500])
+        f.write(f"\n")
+
+    try:
+        result = await slack.get_handler().handle(req)
+        logger.info(f"[Slack] Handler returned successfully")
+        return result
+    except Exception as e:
+        logger.error(f"[Slack] Error: {str(e)}", exc_info=True)
+        raise
+
+
+@app.post("/slack/{path:path}")
+async def slack_catch_all(path: str, request: Request):
+    """Catch all POST requests to /slack/* to see what URL Slack is actually using"""
+    body = await request.body()
+    with open("/tmp/slack_url_check.log", "a") as f:
+        f.write(f"\n{'='*60}\n")
+        f.write(f"Path: /slack/{path}\n")
+        f.write(f"Full URL: {request.url}\n")
+        f.write(f"Body: {body[:300].decode('utf-8', errors='ignore')}\n")
+
+    # If it's the correct endpoint, process it
+    if path == "events":
+        return await slack_events(request)
+    else:
+        return {"error": f"Unknown slack endpoint: /slack/{path}"}
+
+
+@app.get("/slack/test")
+def slack_test():
+    from datetime import datetime, timezone
+    return {"status": "ngrok tunnel is working!", "timestamp": datetime.now(timezone.utc).isoformat()}
 
 
 @app.get("/health")

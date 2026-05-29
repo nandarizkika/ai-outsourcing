@@ -30,6 +30,14 @@ class SkillModule(str, Enum):
     DEEP_ANALYSIS = "deep_analysis"
 
 
+class DeliverableType(str, Enum):
+    ANALYSIS = "analysis"
+    DASHBOARD = "dashboard"
+    REPORT = "report"
+    SLIDES = "slides"
+    RULES = "rules"
+
+
 class Tier(str, Enum):
     BASIC = "basic"
     ADVANCED = "advanced"
@@ -76,6 +84,8 @@ class ClarificationState(BaseModel):
     assumptions: list[str] = []
     deep_dive_pending: bool = False
     deep_dive_confirmed: bool = False
+    deliverable_pending: bool = False
+    selected_deliverable: Optional[DeliverableType] = None
 
 
 class ScheduledJob(BaseModel):
@@ -152,6 +162,8 @@ class Response(BaseModel):
     anomalies: list[Anomaly] = []
     report_markdown: Optional[str] = None
     report_html: Optional[str] = None
+    selected_deliverable: Optional[DeliverableType] = None
+    sql_data: Optional[dict] = None
 
 
 class StepRecord(BaseModel):

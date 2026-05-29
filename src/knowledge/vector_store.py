@@ -16,13 +16,17 @@ class _OpenAIEmbeddingWrapper(EmbeddingFunction[Documents]):
 
 
 class VectorStore:
-    def __init__(self, persist_dir: str, openai_api_key: str):
+    def __init__(self, persist_dir: str, openai_api_key: str = ""):
         self._client = chromadb.PersistentClient(path=persist_dir)
-        _inner_ef = embedding_functions.OpenAIEmbeddingFunction(
-            api_key=openai_api_key,
-            model_name="text-embedding-3-small",
-        )
-        self._ef = _OpenAIEmbeddingWrapper(_inner_ef)
+
+        if openai_api_key:
+            _inner_ef = embedding_functions.OpenAIEmbeddingFunction(
+                api_key=openai_api_key,
+                model_name="text-embedding-3-small",
+            )
+            self._ef = _OpenAIEmbeddingWrapper(_inner_ef)
+        else:
+            self._ef = embedding_functions.DefaultEmbeddingFunction()
 
     def _collection(self, client_id: str):
         return self._client.get_or_create_collection(

@@ -6,6 +6,7 @@ import uuid
 _logger = logging.getLogger(__name__)
 
 from src.core.llm import LLMRouter
+from src.core.business_context import BusinessContextManager
 from src.core.models import (
     Anomaly, TaskType, Request, Response, ClientConfig, SkillModule,
     ClarificationState, AgentResult, AnalystResult,
@@ -63,6 +64,7 @@ class Orchestrator:
         self._ab_agent = ab_agent
         self._registry = registry
         self._report_agent = report_agent
+        self._business_context = BusinessContextManager()
 
     def _detect_deep_intent(self, request: Request) -> bool:
         system = (
@@ -136,8 +138,38 @@ class Orchestrator:
             deep_state.is_resolved = False
             return deep_state
 
+        if clarification_state and clarification_state.deliverable_pending and clarification_state.answers_received:
+            last_answer = clarification_state.answers_received[-1]
+            selected = await asyncio.to_thread(self._parse_deliverable_selection, last_answer)
+
+            if selected:
+                clarification_state.selected_deliverable = selected
+                clarification_state.deliverable_pending = False
+            else:
+                state = ClarificationState(original_request=request)
+                state.deliverable_pending = True
+                state.is_resolved = False
+                suggested = await asyncio.to_thread(self._suggest_deliverable_type, request)
+                suggested_num = {
+                    "analysis": "1",
+                    "dashboard": "2",
+                    "report": "3",
+                    "slides": "4",
+                    "rules": "5",
+                }[suggested.value]
+                state.questions_asked = [
+                    f"Sorry, I didn't understand '{last_answer}'. Please reply with a number (1-5):\n\n"
+                    f"1️⃣ Analysis | 2️⃣ Dashboard | 3️⃣ Report | 4️⃣ Slides | 5️⃣ Rules"
+                ]
+                return state
+
+        if clarification_state is None or not clarification_state.selected_deliverable:
+            deliverable_state = await asyncio.to_thread(self._ask_for_deliverable, request)
+            return deliverable_state
+
         # Stage 1 — Plan
         plan = await asyncio.to_thread(self._plan, request, context)
+        _logger.info(f"[ORCHESTRATOR] Plan decision: {plan}")
         charts: list[bytes] = []
         sql_data: dict | None = None
         sql_queries: list[str] = []
@@ -179,6 +211,7 @@ class Orchestrator:
 
         # SQL — sequential data fetch
         if plan.get("sql") and SkillModule.SQL_QUERYING in config.enabled_skills:
+            _logger.info(f"[ORCHESTRATOR] SQL capability enabled, fetching data...")
             analysis_mode = None
             if plan.get("funnel") and SkillModule.FUNNEL_ANALYSIS in config.enabled_skills:
                 analysis_mode = "funnel"
@@ -193,15 +226,22 @@ class Orchestrator:
 
             if sql_agent is not None:
                 _mode = analysis_mode
+                business_context = self._business_context.get_full_context_prompt()
+                enriched_context = f"{context}\n\n{business_context}" if business_context else context
+                _logger.info(f"[ORCHESTRATOR] Executing SQL agent with mode={_mode}")
                 sql_result = await asyncio.to_thread(
                     lambda: sql_agent.run(
-                        config.client_id, request.text, context, analysis_mode=_mode
+                        config.client_id, request.text, enriched_context, analysis_mode=_mode
                     )
                 )
                 if sql_result.success:
                     sql_data = sql_result.data
                     if sql_data and sql_data.get("query"):
+                        _logger.info(f"[ORCHESTRATOR] SQL Query: {sql_data.get('query')}")
+                        _logger.info(f"[ORCHESTRATOR] SQL Rows returned: {len(sql_data.get('rows', []))}")
                         sql_queries.append(sql_data["query"])
+                else:
+                    _logger.warning(f"[ORCHESTRATOR] SQL execution failed: {sql_result.error}")
 
         # Stage 3 — Analysis agents (parallel)
         if sql_data:
@@ -307,6 +347,8 @@ class Orchestrator:
             sql_data = enriched
 
         # Stage 3b — Generate response (sequential LLM call)
+        if sql_data:
+            _logger.info(f"[ORCHESTRATOR] Generating response with {len(sql_data.get('rows', []))} SQL rows")
         text = await asyncio.to_thread(
             self._generate_response, request, context, sql_data, state.assumptions
         )
@@ -392,6 +434,8 @@ class Orchestrator:
             anomalies=[Anomaly(**a) for a in anomalies],
             report_markdown=report_markdown,
             report_html=report_html,
+            selected_deliverable=clarification_state.selected_deliverable if clarification_state else None,
+            sql_data=sql_data,
         )
 
         if self._memory_logger is not None:
@@ -404,6 +448,70 @@ class Orchestrator:
             )
 
         return response
+
+    def _parse_deliverable_selection(self, response_text: str) -> "DeliverableType | None":
+        from src.core.models import DeliverableType
+
+        text = response_text.strip().lower()
+
+        mapping = {
+            "1": DeliverableType.ANALYSIS,
+            "analysis": DeliverableType.ANALYSIS,
+            "2": DeliverableType.DASHBOARD,
+            "dashboard": DeliverableType.DASHBOARD,
+            "3": DeliverableType.REPORT,
+            "report": DeliverableType.REPORT,
+            "4": DeliverableType.SLIDES,
+            "slides": DeliverableType.SLIDES,
+            "presentation": DeliverableType.SLIDES,
+            "5": DeliverableType.RULES,
+            "rules": DeliverableType.RULES,
+        }
+
+        return mapping.get(text)
+
+    def _suggest_deliverable_type(self, request: Request) -> "DeliverableType":
+        from src.core.models import DeliverableType
+
+        text_lower = request.text.lower()
+
+        if any(word in text_lower for word in ["chart", "visualiz", "graph", "trend", "plot"]):
+            return DeliverableType.DASHBOARD
+        elif any(word in text_lower for word in ["summary", "detail", "report", "comprehensive", "full"]):
+            return DeliverableType.REPORT
+        elif any(word in text_lower for word in ["presentation", "slide", "deck", "powerpoint"]):
+            return DeliverableType.SLIDES
+        elif any(word in text_lower for word in ["alert", "rule", "anomal", "threshold", "warning"]):
+            return DeliverableType.RULES
+
+        return DeliverableType.ANALYSIS
+
+    def _ask_for_deliverable(self, request: Request) -> ClarificationState:
+        from src.core.models import DeliverableType
+
+        suggested = self._suggest_deliverable_type(request)
+        suggested_num = {
+            DeliverableType.ANALYSIS: "1",
+            DeliverableType.DASHBOARD: "2",
+            DeliverableType.REPORT: "3",
+            DeliverableType.SLIDES: "4",
+            DeliverableType.RULES: "5",
+        }[suggested]
+
+        state = ClarificationState(original_request=request)
+        state.deliverable_pending = True
+        state.is_resolved = False
+        state.questions_asked = [
+            f"*What format would you like?* (suggested: {suggested_num})\n\n"
+            f"1️⃣ *Analysis* (text + charts) {'[SUGGESTED]' if suggested == DeliverableType.ANALYSIS else ''}\n"
+            f"2️⃣ *Dashboard* (visualization-focused) {'[SUGGESTED]' if suggested == DeliverableType.DASHBOARD else ''}\n"
+            f"3️⃣ *Report* (detailed markdown) {'[SUGGESTED]' if suggested == DeliverableType.REPORT else ''}\n"
+            f"4️⃣ *Slides* (powerpoint presentation) {'[SUGGESTED]' if suggested == DeliverableType.SLIDES else ''}\n"
+            f"5️⃣ *Rules* (anomalies & alerts) {'[SUGGESTED]' if suggested == DeliverableType.RULES else ''}\n\n"
+            f"_Reply with: 1, 2, 3, 4, or 5_"
+        ]
+
+        return state
 
     def _plan(self, request: Request, context: list[str]) -> dict:
         system = (
@@ -453,13 +561,17 @@ class Orchestrator:
 
         system = (
             "You are a professional AI data analyst. Write a clear, insightful analysis. "
-            "If assumptions were made, state them at the start of your response."
+            "IMPORTANT: Start with the actual findings and insights from the data. "
+            "Do NOT list assumptions first - those go at the end. "
+            "Structure: [Findings/Analysis] then [Assumptions Made] as a separate section."
         )
         user = (
             f"Request: {request.text}\n"
-            f"{assumptions_str}"
             f"Business context:\n{chr(10).join(context)}"
-            f"{data_summary}\n\n"
-            "Write the analysis:"
+            f"{data_summary}\n"
+            f"{assumptions_str}\n"
+            "Write a clear analysis starting with findings first, assumptions at the end:"
         )
-        return self._llm.complete(TaskType.REASONING, system, user)
+        response = self._llm.complete(TaskType.REASONING, system, user)
+        _logger.info(f"[ORCHESTRATOR] Generated response: {response[:500]}")
+        return response
