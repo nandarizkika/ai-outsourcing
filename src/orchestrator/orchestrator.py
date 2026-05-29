@@ -561,14 +561,16 @@ class Orchestrator:
 
         system = (
             "You are a professional AI data analyst. Write a clear, insightful analysis. "
-            "If assumptions were made, state them at the start of your response."
+            "IMPORTANT: Start with the actual findings and insights from the data. "
+            "Do NOT list assumptions first - those go at the end. "
+            "Structure: [Findings/Analysis] then [Assumptions Made] as a separate section."
         )
         user = (
             f"Request: {request.text}\n"
-            f"{assumptions_str}"
             f"Business context:\n{chr(10).join(context)}"
-            f"{data_summary}\n\n"
-            "Write the analysis:"
+            f"{data_summary}\n"
+            f"{assumptions_str}\n"
+            "Write a clear analysis starting with findings first, assumptions at the end:"
         )
         response = self._llm.complete(TaskType.REASONING, system, user)
         _logger.info(f"[ORCHESTRATOR] Generated response: {response[:500]}")
