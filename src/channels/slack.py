@@ -159,28 +159,17 @@ class SlackChannel:
 
         try:
             if result.selected_deliverable and hasattr(SlackFormatter, f"format_{result.selected_deliverable.value}"):
+                from src.core.models import Request, Channel
                 formatter_method = getattr(SlackFormatter, f"format_{result.selected_deliverable.value}")
 
-                if result.selected_deliverable.value == "analysis":
-                    from src.core.models import Request
-                    dummy_request = Request(
-                        channel=None, sender_id="", sender_name="", text="",
-                        timestamp="", client_id=""
-                    )
-                    reply_text = formatter_method(result, dummy_request, result.sql_data)
-                elif result.selected_deliverable.value == "dashboard":
-                    from src.core.models import Request
-                    dummy_request = Request(
-                        channel=None, sender_id="", sender_name="", text="",
-                        timestamp="", client_id=""
-                    )
+                dummy_request = Request(
+                    channel=Channel.SLACK, sender_id="", sender_name="", text="",
+                    timestamp="", client_id=""
+                )
+
+                if result.selected_deliverable.value in ["analysis", "dashboard"]:
                     reply_text = formatter_method(result, dummy_request, result.sql_data)
                 else:
-                    from src.core.models import Request
-                    dummy_request = Request(
-                        channel=None, sender_id="", sender_name="", text="",
-                        timestamp="", client_id=""
-                    )
                     reply_text = formatter_method(result, dummy_request)
         except Exception as e:
             logger.warning(f"[Slack] Failed to format response: {str(e)}")
