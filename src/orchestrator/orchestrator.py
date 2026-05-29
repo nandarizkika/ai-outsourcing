@@ -138,6 +138,31 @@ class Orchestrator:
             deep_state.is_resolved = False
             return deep_state
 
+        if clarification_state and clarification_state.deliverable_pending and clarification_state.answers_received:
+            last_answer = clarification_state.answers_received[-1]
+            selected = await asyncio.to_thread(self._parse_deliverable_selection, last_answer)
+
+            if selected:
+                clarification_state.selected_deliverable = selected
+                clarification_state.deliverable_pending = False
+            else:
+                state = ClarificationState(original_request=request)
+                state.deliverable_pending = True
+                state.is_resolved = False
+                suggested = await asyncio.to_thread(self._suggest_deliverable_type, request)
+                suggested_num = {
+                    "analysis": "1",
+                    "dashboard": "2",
+                    "report": "3",
+                    "slides": "4",
+                    "rules": "5",
+                }[suggested.value]
+                state.questions_asked = [
+                    f"Sorry, I didn't understand '{last_answer}'. Please reply with a number (1-5):\n\n"
+                    f"1️⃣ Analysis | 2️⃣ Dashboard | 3️⃣ Report | 4️⃣ Slides | 5️⃣ Rules"
+                ]
+                return state
+
         if clarification_state is None or not clarification_state.selected_deliverable:
             deliverable_state = await asyncio.to_thread(self._ask_for_deliverable, request)
             return deliverable_state
@@ -422,6 +447,27 @@ class Orchestrator:
 
         return response
 
+    def _parse_deliverable_selection(self, response_text: str) -> "DeliverableType | None":
+        from src.core.models import DeliverableType
+
+        text = response_text.strip().lower()
+
+        mapping = {
+            "1": DeliverableType.ANALYSIS,
+            "analysis": DeliverableType.ANALYSIS,
+            "2": DeliverableType.DASHBOARD,
+            "dashboard": DeliverableType.DASHBOARD,
+            "3": DeliverableType.REPORT,
+            "report": DeliverableType.REPORT,
+            "4": DeliverableType.SLIDES,
+            "slides": DeliverableType.SLIDES,
+            "presentation": DeliverableType.SLIDES,
+            "5": DeliverableType.RULES,
+            "rules": DeliverableType.RULES,
+        }
+
+        return mapping.get(text)
+
     def _suggest_deliverable_type(self, request: Request) -> "DeliverableType":
         from src.core.models import DeliverableType
 
@@ -442,17 +488,25 @@ class Orchestrator:
         from src.core.models import DeliverableType
 
         suggested = self._suggest_deliverable_type(request)
+        suggested_num = {
+            DeliverableType.ANALYSIS: "1",
+            DeliverableType.DASHBOARD: "2",
+            DeliverableType.REPORT: "3",
+            DeliverableType.SLIDES: "4",
+            DeliverableType.RULES: "5",
+        }[suggested]
 
         state = ClarificationState(original_request=request)
         state.deliverable_pending = True
         state.is_resolved = False
         state.questions_asked = [
-            f"What format would you like for the analysis? (I suggest {suggested.value})\n"
-            "• 📊 analysis (text + charts)\n"
-            "• 📈 dashboard (visualization-focused)\n"
-            "• 📋 report (detailed markdown)\n"
-            "• 🎨 slides (powerpoint presentation)\n"
-            "• 📌 rules (anomalies & alerts)"
+            f"*What format would you like?* (suggested: {suggested_num})\n\n"
+            f"1️⃣ *Analysis* (text + charts) {'[SUGGESTED]' if suggested == DeliverableType.ANALYSIS else ''}\n"
+            f"2️⃣ *Dashboard* (visualization-focused) {'[SUGGESTED]' if suggested == DeliverableType.DASHBOARD else ''}\n"
+            f"3️⃣ *Report* (detailed markdown) {'[SUGGESTED]' if suggested == DeliverableType.REPORT else ''}\n"
+            f"4️⃣ *Slides* (powerpoint presentation) {'[SUGGESTED]' if suggested == DeliverableType.SLIDES else ''}\n"
+            f"5️⃣ *Rules* (anomalies & alerts) {'[SUGGESTED]' if suggested == DeliverableType.RULES else ''}\n\n"
+            f"_Reply with: 1, 2, 3, 4, or 5_"
         ]
 
         return state
